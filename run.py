@@ -1,3 +1,4 @@
+import bot
 import asyncio
 from app.main import main
 
