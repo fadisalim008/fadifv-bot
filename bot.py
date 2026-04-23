@@ -2,55 +2,59 @@ import telebot
 import json
 import os
 import random
-from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton, CallbackQuery
+from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
 
 TOKEN = "8667177884:AAFiV6hCpSX2AMyqi9apiiXo0UavZDNan74"
-CHANNEL = "@fadifva"
+CHANNEL = "@fadifva"              # قناة الاشتراك
+BOT_USERNAME = "Fadifvbot"     # يوزر البوت بدون @
+DEV_USERNAME = "fvamv"     # يوزرك بدون @
 
 bot = telebot.TeleBot(TOKEN)
 
 os.makedirs("data", exist_ok=True)
 
-USERS = "data/users.json"
-GROUPS = "data/groups.json"
+USERS_FILE = "data/users.json"
+GROUPS_FILE = "data/groups.json"
 
 
-def load(file):
+def load_data(file_path):
     try:
-        with open(file, "r", encoding="utf-8") as f:
+        with open(file_path, "r", encoding="utf-8") as f:
             return json.load(f)
     except:
         return {}
 
 
-def save(file, data):
-    with open(file, "w", encoding="utf-8") as f:
+def save_data(file_path, data):
+    with open(file_path, "w", encoding="utf-8") as f:
         json.dump(data, f, indent=4, ensure_ascii=False)
 
 
 def save_user(message):
-    users = load(USERS)
-    uid = str(message.from_user.id)
-    if uid not in users:
-        users[uid] = {
+    users = load_data(USERS_FILE)
+    user_id = str(message.from_user.id)
+
+    if user_id not in users:
+        users[user_id] = {
             "name": message.from_user.first_name or "",
             "username": message.from_user.username or ""
         }
-        save(USERS, users)
+        save_data(USERS_FILE, users)
 
 
 def save_group(message):
     if message.chat.type in ["group", "supergroup"]:
-        groups = load(GROUPS)
-        gid = str(message.chat.id)
-        if gid not in groups:
-            groups[gid] = {
+        groups = load_data(GROUPS_FILE)
+        group_id = str(message.chat.id)
+
+        if group_id not in groups:
+            groups[group_id] = {
                 "title": message.chat.title or ""
             }
-            save(GROUPS, groups)
+            save_data(GROUPS_FILE, groups)
 
 
-def check_sub(user_id):
+def is_subscribed(user_id):
     try:
         member = bot.get_chat_member(CHANNEL, user_id)
         return member.status in ["member", "administrator", "creator"]
@@ -58,23 +62,47 @@ def check_sub(user_id):
         return False
 
 
-def require_sub(message):
+def require_subscription(message):
     if message.chat.type == "private":
-        if not check_sub(message.from_user.id):
-            bot.reply_to(message, f"اشترك بالقناة أولاً:\n{CHANNEL}")
+        if not is_subscribed(message.from_user.id):
+            markup = InlineKeyboardMarkup()
+            markup.add(
+                InlineKeyboardButton("اشترك بالقناة", url=f"https://t.me/{CHANNEL.replace('@', '')}")
+            )
+            bot.reply_to(
+                message,
+                f"لازم تشترك بالقناة أولاً:\n{CHANNEL}",
+                reply_markup=markup
+            )
             return False
     return True
 
 
-def main_menu():
+def private_start_buttons():
     markup = InlineKeyboardMarkup(row_width=2)
     markup.add(
-        InlineKeyboardButton("① اوامر الادمنيه", callback_data="admin"),
-        InlineKeyboardButton("② اوامر الاعدادات", callback_data="settings"),
-        InlineKeyboardButton("③ اوامر القفل - الفتح", callback_data="locks"),
-        InlineKeyboardButton("④ اوامر التسليه", callback_data="fun"),
-        InlineKeyboardButton("⑤ اوامر Dev", callback_data="dev"),
-        InlineKeyboardButton("⑥ الاوامر الخدميه", callback_data="service")
+        InlineKeyboardButton("المطور", url=f"https://t.me/{DEV_USERNAME}"),
+        InlineKeyboardButton("اضفني +", url=f"https://t.me/{BOT_USERNAME}?startgroup=true")
+    )
+    markup.add(
+        InlineKeyboardButton("شراء بوت مشابه", url=f"https://t.me/{DEV_USERNAME}")
+    )
+    return markup
+
+
+def commands_menu_buttons():
+    markup = InlineKeyboardMarkup(row_width=2)
+    markup.add(
+        InlineKeyboardButton("1 اوامر الادمنيه", callback_data="admin"),
+        InlineKeyboardButton("2 اوامر الاعدادات", callback_data="settings")
+    )
+    markup.add(
+        InlineKeyboardButton("3 اوامر القفل - الفتح", callback_data="locks"),
+        InlineKeyboardButton("4 اوامر التسليه", callback_data="fun")
+    )
+    markup.add(
+        InlineKeyboardButton("5 اوامر Dev", callback_data="dev"),
+        InlineKeyboardButton("6 الاوامر الخدميه", callback_data="service")
     )
     return markup
 
@@ -84,17 +112,59 @@ def start(message):
     save_user(message)
     save_group(message)
 
-    if not require_sub(message):
+    if message.chat.type == "private":
+        if not require_subscription(message):
+            return
+
+        text = """
+🗽
+- أهلاً بك في بوت الحماية.
+- وظيفتي حماية المجموعات من التفليش والتخريب.
+- لتفعيل البوت أرسل كلمة: تفعيل
+"""
+        photo_url = "https://picsum.photos/700/500"
+
+        try:
+            bot.send_photo(
+                message.chat.id,
+                photo_url,
+                caption=text,
+                reply_markup=private_start_buttons()
+            )
+        except:
+            bot.send_message(
+                message.chat.id,
+                text,
+                reply_markup=private_start_buttons()
+            )
         return
 
     bot.reply_to(message, f"هلا {message.from_user.first_name} 🌷")
 
 
-@bot.message_handler(func=lambda m: m.text in ["الاوامر", "اوامر", "الأوامر"])
-def commands_menu(message):
-    save_user(message)
-    save_group(message)
+@bot.message_handler(func=lambda message: message.text == "تفعيل")
+def activate_bot(message):
+    if message.chat.type in ["group", "supergroup"]:
+        save_group(message)
+        bot.reply_to(
+            message,
+            "تم تفعيل البوت في هذا الكروب ✅\nارسل (الاوامر) حتى تظهر لك قائمة الأوامر."
+        )
 
+
+@bot.message_handler(func=lambda message: message.text in ["مطور", "المطور"])
+def developer_info(message):
+    markup = InlineKeyboardMarkup()
+    markup.add(InlineKeyboardButton("حساب المطور", url=f"https://t.me/{DEV_USERNAME}"))
+    bot.reply_to(
+        message,
+        f"هذا حساب المطور:\n@{DEV_USERNAME}",
+        reply_markup=markup
+    )
+
+
+@bot.message_handler(func=lambda message: message.text in ["الاوامر", "اوامر", "الأوامر"])
+def show_commands_menu(message):
     text = """
 - أهلاً بك عزيزي في قائمة الأوامر :
 
@@ -107,16 +177,14 @@ def commands_menu(message):
 ◂ 6 : الأوامر الخدميه
 ━━━━━━━━━━━━
 """
-    bot.send_message(message.chat.id, text, reply_markup=main_menu())
+    bot.send_message(message.chat.id, text, reply_markup=commands_menu_buttons())
 
 
 @bot.callback_query_handler(func=lambda call: True)
-def callback_handler(call: CallbackQuery):
-    data = call.data
-
-    if data == "admin":
+def callback_handler(call):
+    if call.data == "admin":
         text = """
-👮‍♂️ أهلاً بك عزيزي
+• أهلاً بك في عزيزي
 - قائمة اوامر الادمنيه
 ━━━━━━━━━━━━
 
@@ -172,7 +240,7 @@ def callback_handler(call: CallbackQuery):
         bot.answer_callback_query(call.id, "تم فتح أوامر الادمنيه")
         bot.send_message(call.message.chat.id, text)
 
-    elif data == "settings":
+    elif call.data == "settings":
         text = """
 ⚙️ أهلاً بك عزيزي
 - اوامر الاعدادات
@@ -207,10 +275,9 @@ def callback_handler(call: CallbackQuery):
         bot.answer_callback_query(call.id, "تم فتح أوامر الاعدادات")
         bot.send_message(call.message.chat.id, text)
 
-    elif data == "locks":
+    elif call.data == "locks":
         text = """
-🔒 أهلاً بك عزيزي
-- اوامر القفل - الفتح
+🔒 اوامر القفل - الفتح
 ━━━━━━━━━━━━
 
 • قفل - فتح السب
@@ -247,13 +314,13 @@ def callback_handler(call: CallbackQuery):
 • قفل - فتح الصور بالتقييد
 • قفل - فتح الفيديو بالتقييد
 """
-        bot.answer_callback_query(call.id, "تم فتح أوامر القفل - الفتح")
+        bot.answer_callback_query(call.id, "تم فتح أوامر القفل والفتح")
         bot.send_message(call.message.chat.id, text)
 
-    elif data == "fun":
+    elif call.data == "fun":
         text = """
-🎮 أهلاً بك عزيزي
-- اوامر التسليه
+• اهلا بك عزيزي
+- اوامر التسليه :
 ━━━━━━━━━━━━
 - اوامر تسلية تظهر بالايدي :
 
@@ -270,35 +337,26 @@ def callback_handler(call: CallbackQuery):
 • رفع - تنزيل : خفيفه : الخفيفات
 • رفع - تنزيل : خفيف : الخفيفين
 • رفع بقلبي : تنزيل من قلبي
-
 ━━━━━━━━━━━━
 للقروب:
-
 • رفع + اسم اختياري
 • مسح رتب التسليه
 • رتب التسليه
 • تعطيل التسليه
-
 ━━━━━━━━━━━━
 للعام:
-
-• رفع عام + اسم اختياري
+• رفع عام +اسم اختياري
 • رتب التسليه عام
 • مسح رتب التسليه
-
 ━━━━━━━━━━━━
 • طلاق - زواج
 • زوجي - زوجتي
 • تتزوجني
-
 ━━━━━━━━━━━━
 • اكتموه (تصويت)
 • تعطيل - تفعيل : اكتموه
 • تعطيل - تفعيل : زوجني
-
 ━━━━━━━━━━━━
-- اوامر تسليه شغاله :
-
 • /حظي
 • /صراحة
 • /سؤال
@@ -310,35 +368,36 @@ def callback_handler(call: CallbackQuery):
         bot.answer_callback_query(call.id, "تم فتح أوامر التسليه")
         bot.send_message(call.message.chat.id, text)
 
-    elif data == "dev":
-        text = """
-🛠 أهلاً بك عزيزي
-- اوامر Dev
+    elif call.data == "dev":
+        text = f"""
+🛠 اوامر Dev
 ━━━━━━━━━━━━
-
-• هذه القائمة مخصصة لتطوير البوت
-• لاحقاً نضيف بيها اوامر المطور
-• مثل اذاعة
-• احصائيات
-• تفعيل وتعطيل ميزات عامة
-• صيانة السورس
+• المطور : @{DEV_USERNAME}
+• شراء بوت مشابه
+• دعم فني
+• تطوير سورس
 """
+        markup = InlineKeyboardMarkup()
+        markup.add(InlineKeyboardButton("حساب المطور", url=f"https://t.me/{DEV_USERNAME}"))
         bot.answer_callback_query(call.id, "تم فتح أوامر Dev")
-        bot.send_message(call.message.chat.id, text)
+        bot.send_message(call.message.chat.id, text, reply_markup=markup)
 
-    elif data == "service":
-        text = """
-📡 أهلاً بك عزيزي
-- الاوامر الخدميه
+    elif call.data == "service":
+        users = load_data(USERS_FILE)
+        groups = load_data(GROUPS_FILE)
+        text = f"""
+📡 الاوامر الخدميه
 ━━━━━━━━━━━━
-
 • /start
 • الاوامر
+• مطور
+• تفعيل
 • /id
 • /testdata
-• عرض عدد المستخدمين
-• عرض عدد الكروبات
-• فحص البيانات
+
+━━━━━━━━━━━━
+عدد المستخدمين: {len(users)}
+عدد الكروبات: {len(groups)}
 """
         bot.answer_callback_query(call.id, "تم فتح الاوامر الخدميه")
         bot.send_message(call.message.chat.id, text)
@@ -346,75 +405,81 @@ def callback_handler(call: CallbackQuery):
 
 @bot.message_handler(commands=['حظي'])
 def luck(message):
-    bot.reply_to(message, f"نسبة حظك اليوم: {random.randint(0,100)}% 😎")
+    bot.reply_to(message, f"نسبة حظك اليوم: {random.randint(0, 100)}% 😎")
 
 
 @bot.message_handler(commands=['صراحة'])
 def truth(message):
-    bot.reply_to(message, random.choice([
+    questions = [
         "شنو اكثر شي ندمت عليه؟",
         "تحب من طرف واحد؟ 😏",
         "آخر مرة بكيت ليش؟",
         "شنو سرك الي محد يعرفه؟"
-    ]))
+    ]
+    bot.reply_to(message, random.choice(questions))
 
 
 @bot.message_handler(commands=['سؤال'])
 def question(message):
-    bot.reply_to(message, random.choice([
+    questions = [
         "تحب السهر لو النوم؟",
         "تفضل حب لو صداقة؟",
         "شنو افضل يوم بحياتك؟",
         "تؤمن بالحظ؟"
-    ]))
+    ]
+    bot.reply_to(message, random.choice(questions))
 
 
 @bot.message_handler(commands=['نكتة'])
 def joke(message):
-    bot.reply_to(message, random.choice([
+    jokes = [
         "واحد بخيل وقع من الدرج قال الحمدلله جت على قدمي 😂",
         "واحد غبي راح يشتري شمسية فتحها داخل المحل وطردوه 🤣",
         "واحد سألوه ليش تضحك؟ قال تذكرت نكتة نسيتها 😂"
-    ]))
+    ]
+    bot.reply_to(message, random.choice(jokes))
 
 
 @bot.message_handler(commands=['اهانة'])
 def insult(message):
-    bot.reply_to(message, random.choice([
+    texts = [
         "ولك انت شكو هيج 😂",
         "روح نام احسن لك 😴",
         "عقلك دا يسوي تحديث لو شنو؟ 🤣",
         "انت وضعك يحتاج اعادة تشغيل 😂"
-    ]))
+    ]
+    bot.reply_to(message, random.choice(texts))
 
 
 @bot.message_handler(commands=['تحشيش'])
 def tahsheesh(message):
-    bot.reply_to(message, random.choice([
+    texts = [
         "واحد شاف نفسه بالحلم صحى اعتذر 😂",
         "واحد غبي راح يدرس اونلاين ضيع الواي فاي 🤣",
         "واحد راح يشتري عقل قال خلص الكمية 😂"
-    ]))
+    ]
+    bot.reply_to(message, random.choice(texts))
 
 
 @bot.message_handler(commands=['جلد'])
 def roast(message):
-    bot.reply_to(message, random.choice([
+    texts = [
         "انت لو تجي مسابقة غباء تاخذ مركز اول بدون منافس 😂",
         "انت لو ذكاء جان هسه صرت عالم 🤣",
         "والله وضعك يحتاج صيانة عامة 😭"
-    ]))
+    ]
+    bot.reply_to(message, random.choice(texts))
 
 
 @bot.message_handler(commands=['id'])
 def my_id(message):
-    bot.reply_to(message, f"ايديك: `{message.from_user.id}`", parse_mode="Markdown")
+    bot.reply_to(message, f"ايديك: {message.from_user.id}")
 
 
 @bot.message_handler(commands=['testdata'])
 def testdata(message):
-    users = load(USERS)
-    groups = load(GROUPS)
+    users = load_data(USERS_FILE)
+    groups = load_data(GROUPS_FILE)
     bot.reply_to(
         message,
         f"عدد المستخدمين: {len(users)}\nعدد الكروبات: {len(groups)}"
@@ -422,7 +487,7 @@ def testdata(message):
 
 
 @bot.message_handler(content_types=['new_chat_members'])
-def welcome(message):
+def welcome_new_members(message):
     save_group(message)
     for user in message.new_chat_members:
         try:
@@ -435,10 +500,10 @@ def welcome(message):
 
 
 @bot.message_handler(func=lambda message: True)
-def all_messages(message):
+def save_everything(message):
     save_user(message)
     save_group(message)
 
 
-print("Bot running...")
+print("Bot is running...")
 bot.infinity_polling()
