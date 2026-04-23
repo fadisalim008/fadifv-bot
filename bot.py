@@ -1,6 +1,5 @@
 import os
 import json
-import time
 import telebot
 import yt_dlp
 from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
@@ -91,7 +90,8 @@ def is_subscribed(user_id):
     try:
         member = bot.get_chat_member(FORCE_CHANNEL, user_id)
         return member.status in ["member", "administrator", "creator"]
-    except:
+    except Exception as e:
+        print("SUB CHECK ERROR:", e)
         return False
 
 
@@ -117,6 +117,7 @@ def is_admin(chat_id, user_id):
         member = bot.get_chat_member(chat_id, user_id)
         if member.status in ["creator", "administrator"]:
             return True
+
         rank = get_rank(chat_id, user_id)
         return rank in ["مالك اساسي", "مالك", "منشئ", "مدير", "ادمن", "مشرف"]
     except:
@@ -126,9 +127,11 @@ def is_admin(chat_id, user_id):
 def can_use_admin(message):
     if message.chat.type == "private":
         return False
+
     if not is_admin(message.chat.id, message.from_user.id):
         bot.reply_to(message, "❌ هذا الأمر للمشرفين وما فوق فقط")
         return False
+
     return True
 
 
@@ -248,8 +251,6 @@ HELP_FUN = """
 
 • زواج
 • طلاق
-
-هذه أوامر ترفيهية وتخزن الرتبة داخل البوت.
 """
 
 HELP_DEV = f"""
@@ -269,6 +270,7 @@ HELP_DEV = f"""
 def start(message):
     if not check_sub(message):
         return
+
     bot.send_message(
         message.chat.id,
         "أهلاً بك في بوت فادي المطور 🌷\nاختر من الأزرار بالأسفل 👇",
@@ -352,19 +354,31 @@ def handler(message):
                 return
 
         if locks.get("photos") and message.content_type == "photo" and not is_admin(message.chat.id, message.from_user.id):
-            bot.delete_message(message.chat.id, message.message_id)
+            try:
+                bot.delete_message(message.chat.id, message.message_id)
+            except:
+                pass
             return
 
         if locks.get("videos") and message.content_type == "video" and not is_admin(message.chat.id, message.from_user.id):
-            bot.delete_message(message.chat.id, message.message_id)
+            try:
+                bot.delete_message(message.chat.id, message.message_id)
+            except:
+                pass
             return
 
         if locks.get("stickers") and message.content_type == "sticker" and not is_admin(message.chat.id, message.from_user.id):
-            bot.delete_message(message.chat.id, message.message_id)
+            try:
+                bot.delete_message(message.chat.id, message.message_id)
+            except:
+                pass
             return
 
         if locks.get("forward") and message.forward_date and not is_admin(message.chat.id, message.from_user.id):
-            bot.delete_message(message.chat.id, message.message_id)
+            try:
+                bot.delete_message(message.chat.id, message.message_id)
+            except:
+                pass
             return
 
     if not text:
@@ -389,6 +403,7 @@ def handler(message):
     elif text in ["حظر", "طرد", "كتم", "الغاء الكتم", "الغاء الحظر"]:
         if not can_use_admin(message):
             return
+
         user = target_user(message)
         if not user:
             return
@@ -429,12 +444,15 @@ def handler(message):
                     data["muted"][cid].remove(user_id_str(user.id))
                     save_data(data)
                 bot.reply_to(message, "✅ تم إلغاء الكتم")
+
         except Exception as e:
+            print("ADMIN ERROR:", e)
             bot.reply_to(message, "❌ فشل الأمر، تأكد البوت مشرف وعنده صلاحيات")
 
     elif text == "مسح" or text == "مسح بالرد":
         if not can_use_admin(message):
             return
+
         if message.reply_to_message:
             try:
                 bot.delete_message(message.chat.id, message.reply_to_message.message_id)
@@ -447,6 +465,7 @@ def handler(message):
     elif text.startswith("مسح "):
         if not can_use_admin(message):
             return
+
         try:
             count = int(text.split()[1])
             count = min(count, 100)
@@ -461,28 +480,38 @@ def handler(message):
     elif text.startswith("رفع "):
         if not can_use_admin(message):
             return
+
         user = target_user(message)
         if not user:
             return
+
         rank = text.replace("رفع ", "").strip()
-        allowed = ["مالك اساسي", "مالك", "منشئ", "مدير", "ادمن", "مشرف", "مميز", "هطف", "حمار", "كلب", "خروف", "بقلبي"]
+        allowed = [
+            "مالك اساسي", "مالك", "منشئ", "مدير", "ادمن", "مشرف", "مميز",
+            "هطف", "حمار", "كلب", "خروف", "بقلبي"
+        ]
+
         if rank not in allowed:
             return bot.reply_to(message, "❌ هذه الرتبة غير موجودة")
+
         set_rank(message.chat.id, user.id, rank)
         bot.reply_to(message, f"✅ تم رفعه {rank}")
 
     elif text.startswith("تنزيل "):
         if not can_use_admin(message):
             return
+
         user = target_user(message)
         if not user:
             return
+
         del_rank(message.chat.id, user.id)
         bot.reply_to(message, "✅ تم تنزيل رتبته")
 
     elif text == "تنزيل الكل":
         if not can_use_admin(message):
             return
+
         cid = chat_id_str(message.chat.id)
         data["ranks"][cid] = {}
         save_data(data)
@@ -491,6 +520,7 @@ def handler(message):
     elif text.startswith("قفل "):
         if not can_use_admin(message):
             return
+
         name = text.replace("قفل ", "").strip()
         mapping = {
             "الروابط": "links",
@@ -501,6 +531,7 @@ def handler(message):
             "البوتات": "bots",
             "الكل": "all"
         }
+
         if name in mapping:
             locks[mapping[name]] = True
             save_data(data)
@@ -511,6 +542,7 @@ def handler(message):
     elif text.startswith("فتح "):
         if not can_use_admin(message):
             return
+
         name = text.replace("فتح ", "").strip()
         mapping = {
             "الروابط": "links",
@@ -521,6 +553,7 @@ def handler(message):
             "البوتات": "bots",
             "الكل": "all"
         }
+
         if name in mapping:
             locks[mapping[name]] = False
             save_data(data)
@@ -531,6 +564,7 @@ def handler(message):
     elif text in ["زواج", "طلاق"]:
         if not message.reply_to_message:
             return bot.reply_to(message, "رد على شخص حتى يتم الأمر")
+
         if text == "زواج":
             bot.reply_to(message, f"💍 تم الزواج بينك وبين {message.reply_to_message.from_user.first_name}")
         else:
@@ -542,29 +576,52 @@ def handler(message):
             return bot.reply_to(message, "اكتب اسم الأغنية بعد يوت")
 
         wait = bot.reply_to(message, "🔎 جاري البحث عن الأغنية...")
+
         try:
-            filename_template = f"song_{message.chat.id}_{message.message_id}.%(ext)s"
+            safe_id = f"{message.chat.id}_{message.message_id}"
+            filename_template = f"music_{safe_id}.%(ext)s"
+
             ydl_opts = {
-                "format": "bestaudio/best",
+                "format": "bestaudio[filesize<45M]/bestaudio/best",
                 "outtmpl": filename_template,
-                "quiet": True,
+                "quiet": False,
                 "noplaylist": True,
-                "default_search": "ytsearch1"
+                "default_search": "ytsearch1",
+                "socket_timeout": 60,
+                "retries": 10,
+                "fragment_retries": 10,
+                "nocheckcertificate": True,
+                "geo_bypass": True,
+                "extractor_args": {
+                    "youtube": {
+                        "player_client": ["android", "web"]
+                    }
+                },
+                "http_headers": {
+                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
+                }
             }
 
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                 info = ydl.extract_info(query, download=True)
+
                 if "entries" in info:
                     info = info["entries"][0]
-                filename = ydl.prepare_filename(info)
 
-            bot.edit_message_text("🎧 جاري إرسال الصوت...", message.chat.id, wait.message_id)
+                filename = ydl.prepare_filename(info)
+                title = info.get("title", "Audio")
+
+            bot.edit_message_text(
+                "🎧 جاري إرسال الأغنية...",
+                message.chat.id,
+                wait.message_id
+            )
 
             with open(filename, "rb") as audio:
                 bot.send_audio(
                     message.chat.id,
                     audio,
-                    title=info.get("title", "Audio"),
+                    title=title,
                     performer="Aurelius"
                 )
 
@@ -573,8 +630,14 @@ def handler(message):
             except:
                 pass
 
-        except:
-            bot.reply_to(message, "❌ صار خطأ أثناء جلب الأغنية")
+        except Exception as e:
+            print("MUSIC ERROR:", e)
+            bot.reply_to(
+                message,
+                "❌ صار خطأ أثناء جلب الأغنية.\n"
+                "جرّب تكتب الاسم أوضح مثل:\n"
+                "يوت فيروز سألوني الناس"
+            )
 
 
 print("Aurelius bot is running...")
