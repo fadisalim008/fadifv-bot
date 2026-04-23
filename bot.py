@@ -7,7 +7,7 @@ import re
 from datetime import datetime
 
 BOT_TOKEN = "8667177884:AAFiV6hCpSX2AMyqi9apiiXo0UavZDNan74"
-BOT_USERNAME = "@Fadifvbot"
+BOT_USERNAME = "Fadifvbot"
 DEV_USERNAME = "fvamv"
 DEV_ID = 8065884629  # حط ايديك الرقمي هنا
 
