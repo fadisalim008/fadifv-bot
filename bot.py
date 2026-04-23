@@ -8,7 +8,6 @@ from datetime import datetime
 BOT_TOKEN = "8667177884:AAFiV6hCpSX2AMyqi9apiiXo0UavZDNan74"
 BOT_USERNAME = "Fadifvbot"
 DEV_USERNAME = "fvamv"
-CHANNEL_USERNAME = "fadifva"
 OWNER_ID = 8065884629  # حط ايديك هنا
 
 bot = telebot.TeleBot(BOT_TOKEN, parse_mode="HTML")
@@ -69,7 +68,7 @@ def save_ranks(data):
 
 
 # =========================
-# الداتا الافتراضية
+# البيانات الافتراضية
 # =========================
 DEFAULT_LOCKS = {
     "links": False,
@@ -77,7 +76,6 @@ DEFAULT_LOCKS = {
     "videos": False,
     "stickers": False,
     "forwards": False,
-    "bots": False,
     "chat": False,
     "usernames": False,
 }
@@ -144,24 +142,11 @@ def is_group(message):
     return message.chat.type in ["group", "supergroup"]
 
 
-def is_subscribed(user_id):
+def notify_owner(text):
     try:
-        member = bot.get_chat_member(f"@{CHANNEL_USERNAME}", user_id)
-        return member.status in ["member", "administrator", "creator"]
+        bot.send_message(OWNER_ID, text)
     except:
-        return False
-
-
-def force_sub(message):
-    markup = types.InlineKeyboardMarkup()
-    markup.add(
-        types.InlineKeyboardButton("📢 اشترك بالقناة", url=f"https://t.me/{CHANNEL_USERNAME}")
-    )
-    bot.reply_to(
-        message,
-        f"🚀 لازم تشترك بالقناة حتى تستخدم البوت:\nhttps://t.me/{CHANNEL_USERNAME}",
-        reply_markup=markup
-    )
+        pass
 
 
 def is_telegram_admin(chat_id, user_id):
@@ -280,13 +265,6 @@ def set_lock(chat_id, key, state):
     save_groups(groups)
 
 
-def notify_owner(text):
-    try:
-        bot.send_message(OWNER_ID, text)
-    except:
-        pass
-
-
 # =========================
 # الأزرار
 # =========================
@@ -325,9 +303,6 @@ def start_command(message):
         f"• الايدي: <code>{message.from_user.id}</code>"
     )
 
-    if not is_subscribed(message.from_user.id):
-        return force_sub(message)
-
     caption = (
         "🌿 أهلاً بك في بوت الحماية\n"
         "- أرسل كلمة: الاوامر\n"
@@ -339,7 +314,6 @@ def start_command(message):
         types.InlineKeyboardButton("المطور", url=f"https://t.me/{DEV_USERNAME}"),
         types.InlineKeyboardButton("اضفني +", url=f"https://t.me/{BOT_USERNAME}?startgroup=true")
     )
-    markup.add(types.InlineKeyboardButton("القناة", url=f"https://t.me/{CHANNEL_USERNAME}"))
 
     try:
         with open("welcome.jpg", "rb") as photo:
@@ -354,9 +328,6 @@ def start_command(message):
 @bot.message_handler(func=lambda m: m.text and m.text.strip() in ["الاوامر", "اوامر", "/help"])
 def show_main_menu(message):
     ensure_user(message.from_user)
-
-    if not is_subscribed(message.from_user.id):
-        return force_sub(message)
 
     text = (
         "• قائمة الأوامر :\n\n"
@@ -417,8 +388,6 @@ def callback_handler(call):
 • فتح الملصقات
 • قفل التوجيه
 • فتح التوجيه
-• قفل البوتات
-• فتح البوتات
 • قفل الدردشه
 • فتح الدردشه
 • قفل المعرف
@@ -452,7 +421,6 @@ def callback_handler(call):
 
 ━━━━━━━━━━━━
 • المطور : @{DEV_USERNAME}
-• القناة : @{CHANNEL_USERNAME}
 ━━━━━━━━━━━━""",
 
         "service_cmds": """• الأوامر الخدمية :
@@ -483,12 +451,10 @@ def callback_handler(call):
                 "━━━━━━━━━━━━"
             )
             bot.send_message(call.message.chat.id, text, reply_markup=main_menu_markup())
-
         elif call.data in sections:
             bot.send_message(call.message.chat.id, sections[call.data], reply_markup=back_markup())
 
         bot.answer_callback_query(call.id)
-
     except Exception as e:
         print("Callback Error:", e)
         try:
@@ -899,7 +865,6 @@ def lock_command(message):
         "الفيديو": "videos",
         "الملصقات": "stickers",
         "التوجيه": "forwards",
-        "البوتات": "bots",
         "الدردشه": "chat",
         "الدردشة": "chat",
         "المعرف": "usernames",
@@ -926,7 +891,6 @@ def unlock_command(message):
         "الفيديو": "videos",
         "الملصقات": "stickers",
         "التوجيه": "forwards",
-        "البوتات": "bots",
         "الدردشه": "chat",
         "الدردشة": "chat",
         "المعرف": "usernames",
@@ -1076,7 +1040,6 @@ def show_settings(message):
         f"• الفيديو: {'مقفول' if locks['videos'] else 'مفتوح'}\n"
         f"• الملصقات: {'مقفول' if locks['stickers'] else 'مفتوح'}\n"
         f"• التوجيه: {'مقفول' if locks['forwards'] else 'مفتوح'}\n"
-        f"• البوتات: {'مقفول' if locks['bots'] else 'مفتوح'}\n"
         f"• الدردشة: {'مقفول' if locks['chat'] else 'مفتوح'}\n"
         f"• المعرف: {'مقفول' if locks['usernames'] else 'مفتوح'}"
     )
@@ -1109,12 +1072,6 @@ def welcome_new_members(message):
             f"• الشخص الظاهر بالحدث: {inviter_name}\n"
             f"• ايديه: <code>{inviter_id}</code>"
         )
-
-        if data["locks"]["bots"] and member.is_bot:
-            try:
-                bot.ban_chat_member(message.chat.id, member.id)
-            except:
-                pass
 
     if not data["welcome_enabled"]:
         return
