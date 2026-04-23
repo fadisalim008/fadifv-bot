@@ -1,6 +1,5 @@
 import telebot
 from telebot import types
-from telebot.apihelper import ApiTelegramException
 import json
 import os
 import re
@@ -9,103 +8,88 @@ from datetime import datetime
 BOT_TOKEN = "8667177884:AAFiV6hCpSX2AMyqi9apiiXo0UavZDNan74"
 BOT_USERNAME = "Fadifvbot"
 DEV_USERNAME = "fvamv"
-DEV_ID = 8065884629  # حط ايديك الرقمي هنا
+CHANNEL_USERNAME = "fadifva"
 
 bot = telebot.TeleBot(BOT_TOKEN, parse_mode="HTML")
 
 # =========================
-# ملفات الداتا
+# تجهيز الملفات
 # =========================
 if not os.path.exists("data"):
     os.makedirs("data")
 
-DATA_FILES = {
+FILES = {
     "users": "data/users.json",
     "groups": "data/groups.json",
-    "ranks": "data/ranks.json",
-    "settings": "data/settings.json"
+    "ranks": "data/ranks.json"
 }
 
-for path in DATA_FILES.values():
+for path in FILES.values():
     if not os.path.exists(path):
         with open(path, "w", encoding="utf-8") as f:
             json.dump({}, f, ensure_ascii=False, indent=4)
 
 
-def load_data(filename):
+def load_json(path):
     try:
-        with open(filename, "r", encoding="utf-8") as f:
+        with open(path, "r", encoding="utf-8") as f:
             return json.load(f)
     except:
         return {}
 
 
-def save_data(filename, data):
-    with open(filename, "w", encoding="utf-8") as f:
+def save_json(path, data):
+    with open(path, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=4)
 
 
 def load_users():
-    return load_data(DATA_FILES["users"])
+    return load_json(FILES["users"])
 
 
 def save_users(data):
-    save_data(DATA_FILES["users"], data)
+    save_json(FILES["users"], data)
 
 
 def load_groups():
-    return load_data(DATA_FILES["groups"])
+    return load_json(FILES["groups"])
 
 
 def save_groups(data):
-    save_data(DATA_FILES["groups"], data)
+    save_json(FILES["groups"], data)
 
 
 def load_ranks():
-    return load_data(DATA_FILES["ranks"])
+    return load_json(FILES["ranks"])
 
 
 def save_ranks(data):
-    save_data(DATA_FILES["ranks"], data)
-
-
-def load_settings():
-    return load_data(DATA_FILES["settings"])
-
-
-def save_settings(data):
-    save_data(DATA_FILES["settings"], data)
+    save_json(FILES["ranks"], data)
 
 
 # =========================
-# تهيئة البيانات
+# تهيئة بيانات
 # =========================
 DEFAULT_LOCKS = {
     "links": False,
-    "username": False,
-    "tag": False,
-    "edit": False,
-    "gif": False,
     "photos": False,
-    "video": False,
-    "voice": False,
-    "audio": False,
-    "files": False,
+    "videos": False,
     "stickers": False,
-    "forward": False,
+    "forwards": False,
     "bots": False,
     "chat": False,
+    "usernames": False,
 }
 
-DEFAULT_GROUP_SETTINGS = {
+DEFAULT_GROUP = {
     "welcome_enabled": False,
-    "welcome_text": "أهلاً بك {name} في {group}",
+    "welcome_text": "اهلاً {name} نورت {group} 🌿",
     "rules": "",
     "description": "",
-    "warns": {},
     "locks": DEFAULT_LOCKS.copy(),
-    "mutes": [],
-    "bans": []
+    "warns": {},
+    "muted": [],
+    "banned": []
 }
 
 
@@ -115,7 +99,7 @@ def ensure_user(user):
     if uid not in users:
         users[uid] = {
             "name": user.first_name or "",
-            "username": user.username or "",
+            "username": user.username or ""
         }
         save_users(users)
 
@@ -124,52 +108,56 @@ def ensure_group(chat):
     groups = load_groups()
     gid = str(chat.id)
     if gid not in groups:
-        groups[gid] = DEFAULT_GROUP_SETTINGS.copy()
-        groups[gid]["locks"] = DEFAULT_LOCKS.copy()
+        groups[gid] = {
+            "welcome_enabled": False,
+            "welcome_text": "اهلاً {name} نورت {group} 🌿",
+            "rules": "",
+            "description": "",
+            "locks": DEFAULT_LOCKS.copy(),
+            "warns": {},
+            "muted": [],
+            "banned": []
+        }
         save_groups(groups)
 
     ranks = load_ranks()
     if gid not in ranks:
         ranks[gid] = {
-            "owner_basic": [],
             "owners": [],
-            "supervisors": [],
             "admins_local": [],
             "vips": []
         }
         save_ranks(ranks)
 
 
+def get_group_data(chat_id):
+    groups = load_groups()
+    return groups.get(str(chat_id), DEFAULT_GROUP.copy())
+
+
 # =========================
-# أدوات مساعدة
+# أدوات
 # =========================
 def is_group(message):
     return message.chat.type in ["group", "supergroup"]
 
 
-def is_dev(user_id):
-    return int(user_id) == int(DEV_ID)
+def is_subscribed(user_id):
+    try:
+        member = bot.get_chat_member(f"@{CHANNEL_USERNAME}", user_id)
+        return member.status in ["member", "administrator", "creator"]
+    except:
+        return False
 
 
-def get_group_rank(chat_id, user_id):
-    ranks = load_ranks()
-    gid = str(chat_id)
-    uid = str(user_id)
-
-    if gid not in ranks:
-        return None
-
-    if uid in ranks[gid].get("owner_basic", []):
-        return "owner_basic"
-    if uid in ranks[gid].get("owners", []):
-        return "owner"
-    if uid in ranks[gid].get("supervisors", []):
-        return "supervisor"
-    if uid in ranks[gid].get("admins_local", []):
-        return "admin_local"
-    if uid in ranks[gid].get("vips", []):
-        return "vip"
-    return None
+def force_sub(message):
+    markup = types.InlineKeyboardMarkup()
+    markup.add(types.InlineKeyboardButton("📢 اشترك بالقناة", url=f"https://t.me/{CHANNEL_USERNAME}"))
+    bot.reply_to(
+        message,
+        f"🚀 لازم تشترك بالقناة حتى تستخدم البوت:\nhttps://t.me/{CHANNEL_USERNAME}",
+        reply_markup=markup
+    )
 
 
 def is_telegram_admin(chat_id, user_id):
@@ -180,43 +168,36 @@ def is_telegram_admin(chat_id, user_id):
         return False
 
 
+def get_local_rank(chat_id, user_id):
+    ranks = load_ranks()
+    gid = str(chat_id)
+    uid = str(user_id)
+    if gid not in ranks:
+        return None
+    if uid in ranks[gid].get("owners", []):
+        return "owner"
+    if uid in ranks[gid].get("admins_local", []):
+        return "admin"
+    if uid in ranks[gid].get("vips", []):
+        return "vip"
+    return None
+
+
 def has_admin_power(chat_id, user_id):
-    if is_dev(user_id):
-        return True
     if is_telegram_admin(chat_id, user_id):
         return True
-    rank = get_group_rank(chat_id, user_id)
-    return rank in ["owner_basic", "owner", "supervisor", "admin_local"]
+    return get_local_rank(chat_id, user_id) in ["owner", "admin"]
 
 
-def has_high_rank(chat_id, user_id):
-    if is_dev(user_id):
-        return True
+def has_owner_power(chat_id, user_id):
     if is_telegram_admin(chat_id, user_id):
         return True
-    rank = get_group_rank(chat_id, user_id)
-    return rank in ["owner_basic", "owner", "supervisor"]
+    return get_local_rank(chat_id, user_id) == "owner"
 
 
-def has_owner_rank(chat_id, user_id):
-    if is_dev(user_id):
-        return True
-    if is_telegram_admin(chat_id, user_id):
-        return True
-    rank = get_group_rank(chat_id, user_id)
-    return rank in ["owner_basic", "owner"]
-
-
-def admin_only(message):
-    bot.reply_to(message, "❌ هذا الأمر فقط للمشرف وفوك.")
-
-
-def high_only(message):
-    bot.reply_to(message, "❌ هذا الأمر فقط للمالك أو المشرف الأعلى.")
-
-
-def owner_only(message):
-    bot.reply_to(message, "❌ هذا الأمر فقط للمالك.")
+def mention(user):
+    name = getattr(user, "first_name", None) or str(user.id)
+    return f"<a href='tg://user?id={user.id}'>{name}</a>"
 
 
 def get_target_user(message):
@@ -228,48 +209,47 @@ def get_target_user(message):
         class TempUser:
             def __init__(self, uid):
                 self.id = int(uid)
-                self.first_name = uid
+                self.first_name = str(uid)
         return TempUser(parts[1])
-
     return None
 
 
-def target_is_protected(chat_id, user_id):
-    if is_dev(user_id):
-        return True
+def protected_target(chat_id, user_id):
     if is_telegram_admin(chat_id, user_id):
         return True
-    rank = get_group_rank(chat_id, user_id)
-    return rank in ["owner_basic", "owner", "supervisor", "admin_local"]
+    return get_local_rank(chat_id, user_id) in ["owner", "admin"]
+
+
+def admin_only(message):
+    bot.reply_to(message, "❌ هذا الأمر فقط للمشرف وفوك.")
+
+
+def owner_only(message):
+    bot.reply_to(message, "❌ هذا الأمر فقط للمالك.")
 
 
 def mute_permissions():
-    return types.ChatPermissions(
-        can_send_messages=False
-    )
+    return types.ChatPermissions(can_send_messages=False)
 
 
 def unmute_permissions():
     return types.ChatPermissions(
         can_send_messages=True,
-        can_send_media_messages=True,
         can_send_other_messages=True,
-        can_add_web_page_previews=True
+        can_add_web_page_previews=True,
+        can_send_media_messages=True
     )
-
-
-def mention_user(user):
-    name = user.first_name if hasattr(user, "first_name") else str(user.id)
-    return f"<a href='tg://user?id={user.id}'>{name}</a>"
 
 
 def add_rank(chat_id, user_id, rank_name):
     ranks = load_ranks()
     gid = str(chat_id)
     uid = str(user_id)
-    ensure_group(bot.get_chat(chat_id))
 
-    for key in ["owner_basic", "owners", "supervisors", "admins_local", "vips"]:
+    if gid not in ranks:
+        ranks[gid] = {"owners": [], "admins_local": [], "vips": []}
+
+    for key in ["owners", "admins_local", "vips"]:
         if uid in ranks[gid][key]:
             ranks[gid][key].remove(uid)
 
@@ -281,373 +261,32 @@ def remove_rank(chat_id, user_id, rank_name):
     ranks = load_ranks()
     gid = str(chat_id)
     uid = str(user_id)
+
     if gid in ranks and uid in ranks[gid].get(rank_name, []):
         ranks[gid][rank_name].remove(uid)
         save_ranks(ranks)
 
 
-def clear_rank(chat_id, rank_name):
-    ranks = load_ranks()
-    gid = str(chat_id)
-    if gid in ranks:
-        ranks[gid][rank_name] = []
-        save_ranks(ranks)
-
-
-def lock_name_map(ar_name):
-    mapping = {
-        "الروابط": "links",
-        "المعرف": "username",
-        "التاك": "tag",
-        "التعديل": "edit",
-        "المتحركة": "gif",
-        "الصور": "photos",
-        "الفيديو": "video",
-        "الصوت": "voice",
-        "الصوتيات": "audio",
-        "الملفات": "files",
-        "الملصقات": "stickers",
-        "التوجيه": "forward",
-        "البوتات": "bots",
-        "الدردشه": "chat",
-        "الدردشة": "chat",
-    }
-    return mapping.get(ar_name)
-
-
-def set_lock(chat_id, lock_key, value):
+def set_lock(chat_id, key, state):
     groups = load_groups()
     gid = str(chat_id)
-    ensure_group(bot.get_chat(chat_id))
-    groups = load_groups()
-    groups[gid]["locks"][lock_key] = value
+    groups[gid]["locks"][key] = state
     save_groups(groups)
 
 
-def get_group_data(chat_id):
-    ensure_group(bot.get_chat(chat_id))
-    groups = load_groups()
-    return groups[str(chat_id)]
-
-
 # =========================
-# تسجيل المستخدمين والكروبات
-# =========================
-@bot.message_handler(func=lambda m: True, content_types=[
-    'text', 'photo', 'video', 'audio', 'voice', 'document', 'sticker',
-    'animation', 'new_chat_members', 'left_chat_member'
-])
-def global_handler(message):
-    ensure_user(message.from_user)
-    if message.chat.type in ["group", "supergroup"]:
-        ensure_group(message.chat)
-
-    process_auto_actions(message)
-    process_commands(message)
-
-
-# =========================
-# الحماية التلقائية
-# =========================
-def process_auto_actions(message):
-    if not is_group(message):
-        return
-
-    if has_admin_power(message.chat.id, message.from_user.id):
-        return
-
-    data = get_group_data(message.chat.id)
-    locks = data["locks"]
-
-    if locks["chat"] and message.content_type == "text":
-        try:
-            bot.delete_message(message.chat.id, message.message_id)
-        except:
-            pass
-        return
-
-    if locks["photos"] and message.content_type == "photo":
-        try:
-            bot.delete_message(message.chat.id, message.message_id)
-        except:
-            pass
-
-    if locks["video"] and message.content_type == "video":
-        try:
-            bot.delete_message(message.chat.id, message.message_id)
-        except:
-            pass
-
-    if locks["voice"] and message.content_type == "voice":
-        try:
-            bot.delete_message(message.chat.id, message.message_id)
-        except:
-            pass
-
-    if locks["audio"] and message.content_type == "audio":
-        try:
-            bot.delete_message(message.chat.id, message.message_id)
-        except:
-            pass
-
-    if locks["files"] and message.content_type == "document":
-        try:
-            bot.delete_message(message.chat.id, message.message_id)
-        except:
-            pass
-
-    if locks["stickers"] and message.content_type == "sticker":
-        try:
-            bot.delete_message(message.chat.id, message.message_id)
-        except:
-            pass
-
-    if locks["gif"] and message.content_type == "animation":
-        try:
-            bot.delete_message(message.chat.id, message.message_id)
-        except:
-            pass
-
-    if locks["forward"] and getattr(message, "forward_from", None):
-        try:
-            bot.delete_message(message.chat.id, message.message_id)
-        except:
-            pass
-
-    if locks["bots"] and message.content_type == "new_chat_members":
-        try:
-            for member in message.new_chat_members:
-                if member.is_bot:
-                    bot.ban_chat_member(message.chat.id, member.id)
-        except:
-            pass
-
-    if locks["edit"] and getattr(message, "edit_date", None):
-        try:
-            bot.delete_message(message.chat.id, message.message_id)
-        except:
-            pass
-
-    if message.content_type == "text":
-        text = message.text or ""
-
-        if locks["links"] and re.search(r"(https?://|t\.me/|www\.)", text, re.IGNORECASE):
-            try:
-                bot.delete_message(message.chat.id, message.message_id)
-            except:
-                pass
-            return
-
-        if locks["username"] and "@" in text:
-            try:
-                bot.delete_message(message.chat.id, message.message_id)
-            except:
-                pass
-            return
-
-        if locks["tag"] and "#" in text:
-            try:
-                bot.delete_message(message.chat.id, message.message_id)
-            except:
-                pass
-            return
-
-
-# =========================
-# معالجة الأوامر
-# =========================
-def process_commands(message):
-    if message.content_type != "text":
-        if message.content_type == "new_chat_members":
-            handle_welcome(message)
-        return
-
-    text = (message.text or "").strip()
-
-    if text == "/start":
-        return start_command(message)
-    if text == "مطور":
-        return developer_command(message)
-    if text in ["الاوامر", "اوامر", "/help", "اوامر البوت"]:
-        return show_main_menu(message)
-
-    if text == "ايدي":
-        return bot.reply_to(message, f"🆔 ايديك: <code>{message.from_user.id}</code>")
-    if text == "معلوماتي":
-        rank = get_group_rank(message.chat.id, message.from_user.id) if is_group(message) else None
-        txt = (
-            f"• الاسم: {message.from_user.first_name}\n"
-            f"• الايدي: <code>{message.from_user.id}</code>\n"
-            f"• المعرف: @{message.from_user.username if message.from_user.username else 'لا يوجد'}\n"
-            f"• رتبتك: {rank if rank else 'عضو'}"
-        )
-        return bot.reply_to(message, txt)
-
-    if text == "الوقت":
-        return bot.reply_to(message, f"🕒 الوقت: {datetime.now().strftime('%H:%M:%S')}")
-    if text == "التاريخ":
-        return bot.reply_to(message, f"📅 التاريخ: {datetime.now().strftime('%Y-%m-%d')}")
-
-    if text == "الرابط":
-        if not is_group(message):
-            return
-        if not has_admin_power(message.chat.id, message.from_user.id):
-            return admin_only(message)
-        try:
-            link = bot.export_chat_invite_link(message.chat.id)
-            return bot.reply_to(message, f"🔗 رابط المجموعة:\n{link}")
-        except:
-            return bot.reply_to(message, "❌ ما كدرت أجيب الرابط. تأكد البوت عنده صلاحية دعوة.")
-
-    # رفع وتنزيل
-    if text == "رفع مالك اساسي":
-        return rank_command(message, "owner_basic", "تم رفعه مالك اساسي", need="dev")
-    if text == "تنزيل مالك اساسي":
-        return derank_command(message, "owner_basic", "تم تنزيله من مالك اساسي", need="dev")
-
-    if text == "رفع مالك":
-        return rank_command(message, "owners", "تم رفعه مالك", need="owner")
-    if text == "تنزيل مالك":
-        return derank_command(message, "owners", "تم تنزيله من مالك", need="owner")
-
-    if text == "رفع مشرف":
-        return rank_command(message, "supervisors", "تم رفعه مشرف", need="owner")
-    if text == "تنزيل مشرف":
-        return derank_command(message, "supervisors", "تم تنزيله من مشرف", need="owner")
-
-    if text == "رفع ادمن":
-        return rank_command(message, "admins_local", "تم رفعه ادمن", need="high")
-    if text == "تنزيل ادمن":
-        return derank_command(message, "admins_local", "تم تنزيله من ادمن", need="high")
-
-    if text == "رفع مميز":
-        return rank_command(message, "vips", "تم رفعه مميز", need="high")
-    if text == "تنزيل مميز":
-        return derank_command(message, "vips", "تم تنزيله من مميز", need="high")
-
-    if text == "تنزيل الكل":
-        return clear_all_ranks(message)
-
-    # ادمنية
-    if text == "كتم":
-        return mute_user(message)
-    if text in ["الغاء كتم", "إلغاء كتم", "فك كتم"]:
-        return unmute_user(message)
-    if text == "حظر":
-        return ban_user(message)
-    if text in ["الغاء حظر", "إلغاء حظر", "فك حظر"]:
-        return unban_user(message)
-    if text == "طرد":
-        return kick_user(message)
-    if text == "حذف":
-        return delete_replied_message(message)
-    if text == "تثبيت":
-        return pin_message(message)
-    if text == "الغاء تثبيت":
-        return unpin_message(message)
-    if text == "انذار":
-        return warn_user(message)
-
-    # مسح
-    if text == "مسح المميزين":
-        return clear_specific_rank(message, "vips", "تم مسح المميزين")
-    if text == "مسح الادمنية":
-        return clear_specific_rank(message, "admins_local", "تم مسح الادمنية")
-    if text == "مسح المشرفين":
-        return clear_specific_rank(message, "supervisors", "تم مسح المشرفين")
-    if text == "مسح المالكين":
-        return clear_specific_rank(message, "owners", "تم مسح المالكين")
-    if text == "مسح المحظورين":
-        return clear_bans(message)
-    if text == "مسح المكتومين":
-        return clear_mutes(message)
-
-    # قفل / فتح
-    if text.startswith("قفل "):
-        return lock_command(message, True)
-    if text.startswith("فتح "):
-        return lock_command(message, False)
-
-    # إعدادات
-    if text == "تفعيل الترحيب":
-        return toggle_welcome(message, True)
-    if text == "تعطيل الترحيب":
-        return toggle_welcome(message, False)
-    if text.startswith("وضع ترحيب "):
-        return set_welcome(message)
-    if text == "حذف الترحيب":
-        return delete_welcome(message)
-    if text.startswith("تعيين القوانين "):
-        return set_rules(message)
-    if text == "حذف القوانين":
-        return delete_rules(message)
-    if text == "عرض القوانين":
-        return show_rules(message)
-    if text.startswith("تعيين وصف "):
-        return set_description(message)
-    if text == "عرض الوصف":
-        return show_description(message)
-    if text == "عرض الاعدادات":
-        return show_settings(message)
-
-    # Dev
-    if text == "عدد المستخدمين":
-        return count_users(message)
-    if text == "عدد الكروبات":
-        return count_groups(message)
-    if text.startswith("اذاعة "):
-        return broadcast_message(message)
-
-    # ترحيب
-    if message.content_type == "new_chat_members":
-        return handle_welcome(message)
-
-
-# =========================
-# ستارت ومطور
-# =========================
-def start_command(message):
-    ensure_user(message.from_user)
-    caption = (
-        "🌿 أهلاً بك في بوت الحماية.\n"
-        "- أرسل كلمة: الاوامر\n"
-        "- حتى تظهر لك كل الأقسام."
-    )
-
-    markup = types.InlineKeyboardMarkup()
-    markup.add(
-        types.InlineKeyboardButton("المطور", url=f"https://t.me/{DEV_USERNAME}"),
-        types.InlineKeyboardButton("اضفني +", url=f"https://t.me/{BOT_USERNAME}?startgroup=true")
-    )
-    markup.add(types.InlineKeyboardButton("شراء بوت مشابه", url=f"https://t.me/{DEV_USERNAME}"))
-
-    try:
-        with open("welcome.jpg", "rb") as photo:
-            bot.send_photo(message.chat.id, photo, caption=caption, reply_markup=markup)
-    except:
-        bot.send_message(message.chat.id, caption, reply_markup=markup)
-
-
-def developer_command(message):
-    markup = types.InlineKeyboardMarkup()
-    markup.add(types.InlineKeyboardButton("حساب المطور", url=f"https://t.me/{DEV_USERNAME}"))
-    bot.reply_to(message, f"👨‍💻 المطور:\nhttps://t.me/{DEV_USERNAME}", reply_markup=markup)
-
-
-# =========================
-# القوائم
+# الأزرار
 # =========================
 def main_menu_markup():
     markup = types.InlineKeyboardMarkup(row_width=2)
     markup.add(
         types.InlineKeyboardButton("① اوامر الادمنيه", callback_data="admin_cmds"),
         types.InlineKeyboardButton("② اوامر الرفع والتنزيل", callback_data="rank_cmds"),
-        types.InlineKeyboardButton("③ اوامر المسح", callback_data="clean_cmds"),
-        types.InlineKeyboardButton("④ اوامر القفل والفتح", callback_data="lock_cmds"),
-        types.InlineKeyboardButton("⑤ اوامر الاعدادات", callback_data="settings_cmds"),
-        types.InlineKeyboardButton("⑥ اوامر التسلية", callback_data="fun_cmds"),
-        types.InlineKeyboardButton("⑦ اوامر Dev", callback_data="dev_cmds"),
-        types.InlineKeyboardButton("⑧ الاوامر الخدميه", callback_data="service_cmds"),
+        types.InlineKeyboardButton("③ اوامر القفل والفتح", callback_data="lock_cmds"),
+        types.InlineKeyboardButton("④ اوامر الاعدادات", callback_data="settings_cmds"),
+        types.InlineKeyboardButton("⑤ اوامر التسلية", callback_data="fun_cmds"),
+        types.InlineKeyboardButton("⑥ اوامر Dev", callback_data="dev_cmds"),
+        types.InlineKeyboardButton("⑦ الاوامر الخدمية", callback_data="service_cmds"),
     )
     return markup
 
@@ -658,18 +297,56 @@ def back_markup():
     return markup
 
 
+# =========================
+# ستارت
+# =========================
+@bot.message_handler(commands=["start"])
+def start_command(message):
+    ensure_user(message.from_user)
+
+    if not is_subscribed(message.from_user.id):
+        return force_sub(message)
+
+    caption = (
+        "🌿 أهلاً بك في بوت الحماية\n"
+        "- أرسل كلمة: الاوامر\n"
+        "- حتى تظهر لك الأقسام"
+    )
+
+    markup = types.InlineKeyboardMarkup()
+    markup.add(
+        types.InlineKeyboardButton("المطور", url=f"https://t.me/{DEV_USERNAME}"),
+        types.InlineKeyboardButton("اضفني +", url=f"https://t.me/{BOT_USERNAME}?startgroup=true")
+    )
+    markup.add(types.InlineKeyboardButton("القناة", url=f"https://t.me/{CHANNEL_USERNAME}"))
+
+    try:
+        with open("welcome.jpg", "rb") as photo:
+            bot.send_photo(message.chat.id, photo, caption=caption, reply_markup=markup)
+    except:
+        bot.send_message(message.chat.id, caption, reply_markup=markup)
+
+
+# =========================
+# القوائم
+# =========================
+@bot.message_handler(func=lambda m: m.text and m.text.strip() in ["الاوامر", "اوامر", "/help"])
 def show_main_menu(message):
+    ensure_user(message.from_user)
+
+    if not is_subscribed(message.from_user.id):
+        return force_sub(message)
+
     text = (
-        "• أهلاً بك عزيزي في قائمة الأوامر :\n\n"
+        "• قائمة الأوامر :\n\n"
         "━━━━━━━━━━━━\n"
         "1- أوامر الادمنية\n"
         "2- أوامر الرفع والتنزيل\n"
-        "3- أوامر المسح\n"
-        "4- أوامر القفل والفتح\n"
-        "5- أوامر الإعدادات\n"
-        "6- أوامر التسلية\n"
-        "7- أوامر Dev\n"
-        "8- الأوامر الخدمية\n"
+        "3- أوامر القفل والفتح\n"
+        "4- أوامر الإعدادات\n"
+        "5- أوامر التسلية\n"
+        "6- أوامر Dev\n"
+        "7- الأوامر الخدمية\n"
         "━━━━━━━━━━━━"
     )
     bot.send_message(message.chat.id, text, reply_markup=main_menu_markup())
@@ -690,53 +367,41 @@ def callback_handler(call):
 • الغاء تثبيت
 • حذف
 • انذار
+• مسح المكتومين
+• مسح المحظورين
 ━━━━━━━━━━━━
 • ملاحظة: بالرد على رسالة الشخص""",
 
         "rank_cmds": """• أوامر الرفع والتنزيل :
 
 ━━━━━━━━━━━━
-• رفع مالك اساسي
-• تنزيل مالك اساسي
 • رفع مالك
 • تنزيل مالك
-• رفع مشرف
-• تنزيل مشرف
 • رفع ادمن
 • تنزيل ادمن
 • رفع مميز
 • تنزيل مميز
-• تنزيل الكل
 ━━━━━━━━━━━━""",
 
-        "clean_cmds": """• أوامر المسح :
+        "lock_cmds": """• أوامر القفل والفتح :
 
 ━━━━━━━━━━━━
-• مسح المميزين
-• مسح الادمنية
-• مسح المشرفين
-• مسح المالكين
-• مسح المحظورين
-• مسح المكتومين
-━━━━━━━━━━━━""",
-
-        "lock_cmds": """• أوامر القفل - الفتح :
-
-━━━━━━━━━━━━
-• قفل - فتح الروابط
-• قفل - فتح المعرف
-• قفل - فتح التاك
-• قفل - فتح التعديل
-• قفل - فتح المتحركة
-• قفل - فتح الصور
-• قفل - فتح الفيديو
-• قفل - فتح الصوت
-• قفل - فتح الصوتيات
-• قفل - فتح الملفات
-• قفل - فتح الملصقات
-• قفل - فتح الدردشه
-• قفل - فتح التوجيه
-• قفل - فتح البوتات
+• قفل الروابط
+• فتح الروابط
+• قفل الصور
+• فتح الصور
+• قفل الفيديو
+• فتح الفيديو
+• قفل الملصقات
+• فتح الملصقات
+• قفل التوجيه
+• فتح التوجيه
+• قفل البوتات
+• فتح البوتات
+• قفل الدردشه
+• فتح الدردشه
+• قفل المعرف
+• فتح المعرف
 ━━━━━━━━━━━━""",
 
         "settings_cmds": """• أوامر الاعدادات :
@@ -747,8 +412,8 @@ def callback_handler(call):
 • وضع ترحيب + النص
 • حذف الترحيب
 • تعيين القوانين + النص
-• حذف القوانين
 • عرض القوانين
+• حذف القوانين
 • تعيين وصف + النص
 • عرض الوصف
 • عرض الاعدادات
@@ -757,19 +422,16 @@ def callback_handler(call):
         "fun_cmds": """• أوامر التسلية :
 
 ━━━━━━━━━━━━
-• لعبة اكس او
-• تحدي
 • حقيقة
+• تحدي
 • حكم
-━━━━━━━━━━━━
-• هذا القسم واجهة حالياً""",
+━━━━━━━━━━━━""",
 
-        "dev_cmds": """• أوامر Dev :
+        "dev_cmds": f"""• أوامر Dev :
 
 ━━━━━━━━━━━━
-• اذاعة + النص
-• عدد المستخدمين
-• عدد الكروبات
+• المطور : @{DEV_USERNAME}
+• القناة : @{CHANNEL_USERNAME}
 ━━━━━━━━━━━━""",
 
         "service_cmds": """• الأوامر الخدمية :
@@ -777,7 +439,6 @@ def callback_handler(call):
 ━━━━━━━━━━━━
 • الاوامر
 • مطور
-• /start
 • ايدي
 • معلوماتي
 • الرابط
@@ -786,86 +447,188 @@ def callback_handler(call):
 ━━━━━━━━━━━━"""
     }
 
-    if call.data == "back_main":
-        text = (
-            "• أهلاً بك عزيزي في قائمة الأوامر :\n\n"
-            "━━━━━━━━━━━━\n"
-            "1- أوامر الادمنية\n"
-            "2- أوامر الرفع والتنزيل\n"
-            "3- أوامر المسح\n"
-            "4- أوامر القفل والفتح\n"
-            "5- أوامر الإعدادات\n"
-            "6- أوامر التسلية\n"
-            "7- أوامر Dev\n"
-            "8- الأوامر الخدمية\n"
-            "━━━━━━━━━━━━"
-        )
-        bot.edit_message_text(text, call.message.chat.id, call.message.message_id, reply_markup=main_menu_markup())
-    elif call.data in sections:
-        bot.edit_message_text(sections[call.data], call.message.chat.id, call.message.message_id, reply_markup=back_markup())
+    main_text = (
+        "• قائمة الأوامر :\n\n"
+        "━━━━━━━━━━━━\n"
+        "1- أوامر الادمنية\n"
+        "2- أوامر الرفع والتنزيل\n"
+        "3- أوامر القفل والفتح\n"
+        "4- أوامر الإعدادات\n"
+        "5- أوامر التسلية\n"
+        "6- أوامر Dev\n"
+        "7- الأوامر الخدمية\n"
+        "━━━━━━━━━━━━"
+    )
 
-    bot.answer_callback_query(call.id)
+    try:
+        if call.data == "back_main":
+            bot.edit_message_text(
+                text=main_text,
+                chat_id=call.message.chat.id,
+                message_id=call.message.message_id,
+                reply_markup=main_menu_markup()
+            )
+        elif call.data in sections:
+            bot.edit_message_text(
+                text=sections[call.data],
+                chat_id=call.message.chat.id,
+                message_id=call.message.message_id,
+                reply_markup=back_markup()
+            )
+        bot.answer_callback_query(call.id)
+    except Exception as e:
+        print("Callback Error:", e)
+        try:
+            bot.answer_callback_query(call.id, "صار خطأ، جرب مرة ثانية")
+        except:
+            pass
 
 
 # =========================
-# رفع وتنزيل
+# أوامر خدمية
 # =========================
-def rank_command(message, rank_name, success_text, need="high"):
+@bot.message_handler(func=lambda m: m.text == "مطور")
+def developer_command(message):
+    bot.reply_to(message, f"👨‍💻 المطور:\nhttps://t.me/{DEV_USERNAME}")
+
+
+@bot.message_handler(func=lambda m: m.text == "ايدي")
+def my_id(message):
+    bot.reply_to(message, f"🆔 ايديك: <code>{message.from_user.id}</code>")
+
+
+@bot.message_handler(func=lambda m: m.text == "معلوماتي")
+def my_info(message):
+    rank = get_local_rank(message.chat.id, message.from_user.id) if is_group(message) else None
+    text = (
+        f"• الاسم: {message.from_user.first_name}\n"
+        f"• الايدي: <code>{message.from_user.id}</code>\n"
+        f"• المعرف: @{message.from_user.username if message.from_user.username else 'لا يوجد'}\n"
+        f"• الرتبة: {rank if rank else 'عضو'}"
+    )
+    bot.reply_to(message, text)
+
+
+@bot.message_handler(func=lambda m: m.text == "الوقت")
+def current_time(message):
+    bot.reply_to(message, f"🕒 الوقت: {datetime.now().strftime('%H:%M:%S')}")
+
+
+@bot.message_handler(func=lambda m: m.text == "التاريخ")
+def current_date(message):
+    bot.reply_to(message, f"📅 التاريخ: {datetime.now().strftime('%Y-%m-%d')}")
+
+
+@bot.message_handler(func=lambda m: m.text == "الرابط")
+def group_link(message):
     if not is_group(message):
         return
-    if need == "dev" and not is_dev(message.from_user.id):
-        return bot.reply_to(message, "❌ هذا الأمر فقط للمطور.")
-    if need == "owner" and not has_owner_rank(message.chat.id, message.from_user.id):
+    if not has_admin_power(message.chat.id, message.from_user.id):
+        return admin_only(message)
+    try:
+        link = bot.export_chat_invite_link(message.chat.id)
+        bot.reply_to(message, f"🔗 رابط المجموعة:\n{link}")
+    except:
+        bot.reply_to(message, "❌ البوت يحتاج صلاحية دعوة عبر الرابط.")
+
+
+# =========================
+# الرفع والتنزيل
+# =========================
+@bot.message_handler(func=lambda m: m.text == "رفع مالك")
+def raise_owner(message):
+    if not is_group(message):
+        return
+    if not has_owner_power(message.chat.id, message.from_user.id):
         return owner_only(message)
-    if need == "high" and not has_high_rank(message.chat.id, message.from_user.id):
-        return high_only(message)
 
     target = get_target_user(message)
     if not target:
         return bot.reply_to(message, "❌ لازم ترد على رسالة الشخص.")
 
-    add_rank(message.chat.id, target.id, rank_name)
-    bot.reply_to(message, f"✅ {success_text}\n{mention_user(target)}")
+    add_rank(message.chat.id, target.id, "owners")
+    bot.reply_to(message, f"✅ تم رفعه مالك\n{mention(target)}")
 
 
-def derank_command(message, rank_name, success_text, need="high"):
+@bot.message_handler(func=lambda m: m.text == "تنزيل مالك")
+def demote_owner(message):
     if not is_group(message):
         return
-    if need == "dev" and not is_dev(message.from_user.id):
-        return bot.reply_to(message, "❌ هذا الأمر فقط للمطور.")
-    if need == "owner" and not has_owner_rank(message.chat.id, message.from_user.id):
+    if not has_owner_power(message.chat.id, message.from_user.id):
         return owner_only(message)
-    if need == "high" and not has_high_rank(message.chat.id, message.from_user.id):
-        return high_only(message)
 
     target = get_target_user(message)
     if not target:
         return bot.reply_to(message, "❌ لازم ترد على رسالة الشخص.")
 
-    remove_rank(message.chat.id, target.id, rank_name)
-    bot.reply_to(message, f"✅ {success_text}\n{mention_user(target)}")
+    remove_rank(message.chat.id, target.id, "owners")
+    bot.reply_to(message, f"✅ تم تنزيله من مالك\n{mention(target)}")
 
 
-def clear_all_ranks(message):
+@bot.message_handler(func=lambda m: m.text == "رفع ادمن")
+def raise_admin(message):
     if not is_group(message):
         return
-    if not has_owner_rank(message.chat.id, message.from_user.id):
+    if not has_owner_power(message.chat.id, message.from_user.id):
         return owner_only(message)
 
-    ranks = load_ranks()
-    gid = str(message.chat.id)
-    if gid in ranks:
-        ranks[gid]["owners"] = []
-        ranks[gid]["supervisors"] = []
-        ranks[gid]["admins_local"] = []
-        ranks[gid]["vips"] = []
-        save_ranks(ranks)
-    bot.reply_to(message, "✅ تم تنزيل الكل.")
+    target = get_target_user(message)
+    if not target:
+        return bot.reply_to(message, "❌ لازم ترد على رسالة الشخص.")
+
+    add_rank(message.chat.id, target.id, "admins_local")
+    bot.reply_to(message, f"✅ تم رفعه ادمن\n{mention(target)}")
+
+
+@bot.message_handler(func=lambda m: m.text == "تنزيل ادمن")
+def demote_admin(message):
+    if not is_group(message):
+        return
+    if not has_owner_power(message.chat.id, message.from_user.id):
+        return owner_only(message)
+
+    target = get_target_user(message)
+    if not target:
+        return bot.reply_to(message, "❌ لازم ترد على رسالة الشخص.")
+
+    remove_rank(message.chat.id, target.id, "admins_local")
+    bot.reply_to(message, f"✅ تم تنزيله من ادمن\n{mention(target)}")
+
+
+@bot.message_handler(func=lambda m: m.text == "رفع مميز")
+def raise_vip(message):
+    if not is_group(message):
+        return
+    if not has_admin_power(message.chat.id, message.from_user.id):
+        return admin_only(message)
+
+    target = get_target_user(message)
+    if not target:
+        return bot.reply_to(message, "❌ لازم ترد على رسالة الشخص.")
+
+    add_rank(message.chat.id, target.id, "vips")
+    bot.reply_to(message, f"✅ تم رفعه مميز\n{mention(target)}")
+
+
+@bot.message_handler(func=lambda m: m.text == "تنزيل مميز")
+def demote_vip(message):
+    if not is_group(message):
+        return
+    if not has_admin_power(message.chat.id, message.from_user.id):
+        return admin_only(message)
+
+    target = get_target_user(message)
+    if not target:
+        return bot.reply_to(message, "❌ لازم ترد على رسالة الشخص.")
+
+    remove_rank(message.chat.id, target.id, "vips")
+    bot.reply_to(message, f"✅ تم تنزيله من مميز\n{mention(target)}")
 
 
 # =========================
-# الادمنية
+# أوامر الادمنية
 # =========================
+@bot.message_handler(func=lambda m: m.text == "كتم")
 def mute_user(message):
     if not is_group(message):
         return
@@ -875,21 +638,22 @@ def mute_user(message):
     target = get_target_user(message)
     if not target:
         return bot.reply_to(message, "❌ لازم ترد على رسالة الشخص.")
-    if target_is_protected(message.chat.id, target.id):
-        return bot.reply_to(message, "❌ ما أگدر أكتم هذا الشخص.")
+    if protected_target(message.chat.id, target.id):
+        return bot.reply_to(message, "❌ ما اكدر أكتم هذا الشخص.")
 
     try:
         bot.restrict_chat_member(message.chat.id, target.id, permissions=mute_permissions())
         groups = load_groups()
         gid = str(message.chat.id)
-        if str(target.id) not in groups[gid]["mutes"]:
-            groups[gid]["mutes"].append(str(target.id))
+        if str(target.id) not in groups[gid]["muted"]:
+            groups[gid]["muted"].append(str(target.id))
             save_groups(groups)
-        bot.reply_to(message, f"🔇 تم كتم {mention_user(target)}")
+        bot.reply_to(message, f"🔇 تم كتم {mention(target)}")
     except:
-        bot.reply_to(message, "❌ فشل الكتم.")
+        bot.reply_to(message, "❌ فشل الكتم. تأكد البوت أدمن وعنده صلاحية تقييد.")
 
 
+@bot.message_handler(func=lambda m: m.text in ["الغاء كتم", "إلغاء كتم", "فك كتم"])
 def unmute_user(message):
     if not is_group(message):
         return
@@ -904,14 +668,15 @@ def unmute_user(message):
         bot.restrict_chat_member(message.chat.id, target.id, permissions=unmute_permissions())
         groups = load_groups()
         gid = str(message.chat.id)
-        if str(target.id) in groups[gid]["mutes"]:
-            groups[gid]["mutes"].remove(str(target.id))
+        if str(target.id) in groups[gid]["muted"]:
+            groups[gid]["muted"].remove(str(target.id))
             save_groups(groups)
-        bot.reply_to(message, f"🔊 تم الغاء كتم {mention_user(target)}")
+        bot.reply_to(message, f"🔊 تم الغاء كتم {mention(target)}")
     except:
         bot.reply_to(message, "❌ فشل الغاء الكتم.")
 
 
+@bot.message_handler(func=lambda m: m.text == "حظر")
 def ban_user(message):
     if not is_group(message):
         return
@@ -921,21 +686,22 @@ def ban_user(message):
     target = get_target_user(message)
     if not target:
         return bot.reply_to(message, "❌ لازم ترد على رسالة الشخص.")
-    if target_is_protected(message.chat.id, target.id):
-        return bot.reply_to(message, "❌ ما أگدر أحظر هذا الشخص.")
+    if protected_target(message.chat.id, target.id):
+        return bot.reply_to(message, "❌ ما اكدر أحظر هذا الشخص.")
 
     try:
         bot.ban_chat_member(message.chat.id, target.id)
         groups = load_groups()
         gid = str(message.chat.id)
-        if str(target.id) not in groups[gid]["bans"]:
-            groups[gid]["bans"].append(str(target.id))
+        if str(target.id) not in groups[gid]["banned"]:
+            groups[gid]["banned"].append(str(target.id))
             save_groups(groups)
-        bot.reply_to(message, f"🚫 تم حظر {mention_user(target)}")
+        bot.reply_to(message, f"🚫 تم حظر {mention(target)}")
     except:
         bot.reply_to(message, "❌ فشل الحظر.")
 
 
+@bot.message_handler(func=lambda m: m.text in ["الغاء حظر", "إلغاء حظر", "فك حظر"])
 def unban_user(message):
     if not is_group(message):
         return
@@ -945,18 +711,20 @@ def unban_user(message):
     target = get_target_user(message)
     if not target:
         return bot.reply_to(message, "❌ لازم ترد على رسالة الشخص أو تكتب ايديه.")
+
     try:
         bot.unban_chat_member(message.chat.id, target.id, only_if_banned=False)
         groups = load_groups()
         gid = str(message.chat.id)
-        if str(target.id) in groups[gid]["bans"]:
-            groups[gid]["bans"].remove(str(target.id))
+        if str(target.id) in groups[gid]["banned"]:
+            groups[gid]["banned"].remove(str(target.id))
             save_groups(groups)
-        bot.reply_to(message, f"✅ تم الغاء حظر {mention_user(target)}")
+        bot.reply_to(message, f"✅ تم الغاء حظر {mention(target)}")
     except:
         bot.reply_to(message, "❌ فشل الغاء الحظر.")
 
 
+@bot.message_handler(func=lambda m: m.text == "طرد")
 def kick_user(message):
     if not is_group(message):
         return
@@ -966,24 +734,26 @@ def kick_user(message):
     target = get_target_user(message)
     if not target:
         return bot.reply_to(message, "❌ لازم ترد على رسالة الشخص.")
-    if target_is_protected(message.chat.id, target.id):
-        return bot.reply_to(message, "❌ ما أگدر أطرد هذا الشخص.")
+    if protected_target(message.chat.id, target.id):
+        return bot.reply_to(message, "❌ ما اكدر أطرد هذا الشخص.")
 
     try:
         bot.ban_chat_member(message.chat.id, target.id)
         bot.unban_chat_member(message.chat.id, target.id)
-        bot.reply_to(message, f"👢 تم طرد {mention_user(target)}")
+        bot.reply_to(message, f"👢 تم طرد {mention(target)}")
     except:
         bot.reply_to(message, "❌ فشل الطرد.")
 
 
-def delete_replied_message(message):
+@bot.message_handler(func=lambda m: m.text == "حذف")
+def delete_replied(message):
     if not is_group(message):
         return
     if not has_admin_power(message.chat.id, message.from_user.id):
         return admin_only(message)
     if not message.reply_to_message:
         return bot.reply_to(message, "❌ لازم ترد على رسالة.")
+
     try:
         bot.delete_message(message.chat.id, message.reply_to_message.message_id)
         bot.delete_message(message.chat.id, message.message_id)
@@ -991,6 +761,7 @@ def delete_replied_message(message):
         bot.reply_to(message, "❌ ما كدرت أحذف الرسالة.")
 
 
+@bot.message_handler(func=lambda m: m.text == "تثبيت")
 def pin_message(message):
     if not is_group(message):
         return
@@ -998,6 +769,7 @@ def pin_message(message):
         return admin_only(message)
     if not message.reply_to_message:
         return bot.reply_to(message, "❌ لازم ترد على رسالة.")
+
     try:
         bot.pin_chat_message(message.chat.id, message.reply_to_message.message_id)
         bot.reply_to(message, "📌 تم تثبيت الرسالة.")
@@ -1005,11 +777,13 @@ def pin_message(message):
         bot.reply_to(message, "❌ فشل التثبيت.")
 
 
-def unpin_message(message):
+@bot.message_handler(func=lambda m: m.text == "الغاء تثبيت")
+def unpin_messages(message):
     if not is_group(message):
         return
     if not has_admin_power(message.chat.id, message.from_user.id):
         return admin_only(message)
+
     try:
         bot.unpin_all_chat_messages(message.chat.id)
         bot.reply_to(message, "✅ تم الغاء التثبيت.")
@@ -1017,6 +791,7 @@ def unpin_message(message):
         bot.reply_to(message, "❌ فشل الغاء التثبيت.")
 
 
+@bot.message_handler(func=lambda m: m.text == "انذار")
 def warn_user(message):
     if not is_group(message):
         return
@@ -1026,8 +801,8 @@ def warn_user(message):
         return bot.reply_to(message, "❌ لازم ترد على رسالة الشخص.")
 
     target = message.reply_to_message.from_user
-    if target_is_protected(message.chat.id, target.id):
-        return bot.reply_to(message, "❌ ما أگدر أنذر هذا الشخص.")
+    if protected_target(message.chat.id, target.id):
+        return bot.reply_to(message, "❌ ما اكدر أنذر هذا الشخص.")
 
     groups = load_groups()
     gid = str(message.chat.id)
@@ -1041,136 +816,180 @@ def warn_user(message):
     if count >= 3:
         try:
             bot.ban_chat_member(message.chat.id, target.id)
-            if uid not in groups[gid]["bans"]:
-                groups[gid]["bans"].append(uid)
+            if uid not in groups[gid]["banned"]:
+                groups[gid]["banned"].append(uid)
                 save_groups(groups)
-            bot.reply_to(message, f"🚫 تم حظر {mention_user(target)} بعد 3 إنذارات.")
+            bot.reply_to(message, f"🚫 تم حظر {mention(target)} بعد 3 إنذارات.")
         except:
-            bot.reply_to(message, f"⚠️ انذار رقم {count} لـ {mention_user(target)}")
+            bot.reply_to(message, f"⚠️ انذار رقم {count} لـ {mention(target)}")
     else:
-        bot.reply_to(message, f"⚠️ انذار رقم {count} لـ {mention_user(target)}")
+        bot.reply_to(message, f"⚠️ انذار رقم {count} لـ {mention(target)}")
 
 
-# =========================
-# المسح
-# =========================
-def clear_specific_rank(message, rank_name, success_text):
+@bot.message_handler(func=lambda m: m.text == "مسح المكتومين")
+def clear_muted(message):
     if not is_group(message):
         return
-    if not has_owner_rank(message.chat.id, message.from_user.id):
-        return owner_only(message)
-    clear_rank(message.chat.id, rank_name)
-    bot.reply_to(message, f"✅ {success_text}")
-
-
-def clear_bans(message):
-    if not is_group(message):
-        return
-    if not has_owner_rank(message.chat.id, message.from_user.id):
+    if not has_owner_power(message.chat.id, message.from_user.id):
         return owner_only(message)
 
     groups = load_groups()
     gid = str(message.chat.id)
-    for uid in groups[gid]["bans"][:]:
-        try:
-            bot.unban_chat_member(message.chat.id, int(uid), only_if_banned=False)
-        except:
-            pass
-    groups[gid]["bans"] = []
-    save_groups(groups)
-    bot.reply_to(message, "✅ تم مسح المحظورين.")
 
-
-def clear_mutes(message):
-    if not is_group(message):
-        return
-    if not has_owner_rank(message.chat.id, message.from_user.id):
-        return owner_only(message)
-
-    groups = load_groups()
-    gid = str(message.chat.id)
-    for uid in groups[gid]["mutes"][:]:
+    for uid in groups[gid]["muted"][:]:
         try:
             bot.restrict_chat_member(message.chat.id, int(uid), permissions=unmute_permissions())
         except:
             pass
-    groups[gid]["mutes"] = []
+
+    groups[gid]["muted"] = []
     save_groups(groups)
     bot.reply_to(message, "✅ تم مسح المكتومين.")
+
+
+@bot.message_handler(func=lambda m: m.text == "مسح المحظورين")
+def clear_banned(message):
+    if not is_group(message):
+        return
+    if not has_owner_power(message.chat.id, message.from_user.id):
+        return owner_only(message)
+
+    groups = load_groups()
+    gid = str(message.chat.id)
+
+    for uid in groups[gid]["banned"][:]:
+        try:
+            bot.unban_chat_member(message.chat.id, int(uid), only_if_banned=False)
+        except:
+            pass
+
+    groups[gid]["banned"] = []
+    save_groups(groups)
+    bot.reply_to(message, "✅ تم مسح المحظورين.")
 
 
 # =========================
 # القفل والفتح
 # =========================
-def lock_command(message, state):
+@bot.message_handler(func=lambda m: m.text and m.text.startswith("قفل "))
+def lock_command(message):
     if not is_group(message):
         return
-    if not has_high_rank(message.chat.id, message.from_user.id):
-        return high_only(message)
+    if not has_admin_power(message.chat.id, message.from_user.id):
+        return admin_only(message)
 
-    parts = message.text.split(maxsplit=1)
-    if len(parts) < 2:
-        return bot.reply_to(message, "❌ اكتب الأمر بهذا الشكل: قفل الروابط")
+    target = message.text.replace("قفل ", "", 1).strip()
+    mapping = {
+        "الروابط": "links",
+        "الصور": "photos",
+        "الفيديو": "videos",
+        "الملصقات": "stickers",
+        "التوجيه": "forwards",
+        "البوتات": "bots",
+        "الدردشه": "chat",
+        "الدردشة": "chat",
+        "المعرف": "usernames",
+    }
 
-    key = lock_name_map(parts[1].strip())
-    if not key:
-        return bot.reply_to(message, "❌ هذا النوع غير مدعوم حالياً.")
+    if target not in mapping:
+        return bot.reply_to(message, "❌ هذا النوع غير مدعوم.")
 
-    set_lock(message.chat.id, key, state)
-    bot.reply_to(message, f"✅ تم {'قفل' if state else 'فتح'} {parts[1].strip()}")
+    set_lock(message.chat.id, mapping[target], True)
+    bot.reply_to(message, f"✅ تم قفل {target}")
+
+
+@bot.message_handler(func=lambda m: m.text and m.text.startswith("فتح "))
+def unlock_command(message):
+    if not is_group(message):
+        return
+    if not has_admin_power(message.chat.id, message.from_user.id):
+        return admin_only(message)
+
+    target = message.text.replace("فتح ", "", 1).strip()
+    mapping = {
+        "الروابط": "links",
+        "الصور": "photos",
+        "الفيديو": "videos",
+        "الملصقات": "stickers",
+        "التوجيه": "forwards",
+        "البوتات": "bots",
+        "الدردشه": "chat",
+        "الدردشة": "chat",
+        "المعرف": "usernames",
+    }
+
+    if target not in mapping:
+        return bot.reply_to(message, "❌ هذا النوع غير مدعوم.")
+
+    set_lock(message.chat.id, mapping[target], False)
+    bot.reply_to(message, f"✅ تم فتح {target}")
 
 
 # =========================
-# الإعدادات
+# الاعدادات
 # =========================
-def toggle_welcome(message, value):
+@bot.message_handler(func=lambda m: m.text == "تفعيل الترحيب")
+def enable_welcome(message):
     if not is_group(message):
         return
-    if not has_high_rank(message.chat.id, message.from_user.id):
-        return high_only(message)
+    if not has_admin_power(message.chat.id, message.from_user.id):
+        return admin_only(message)
 
     groups = load_groups()
-    gid = str(message.chat.id)
-    groups[gid]["welcome_enabled"] = value
+    groups[str(message.chat.id)]["welcome_enabled"] = True
     save_groups(groups)
-    bot.reply_to(message, f"✅ تم {'تفعيل' if value else 'تعطيل'} الترحيب.")
+    bot.reply_to(message, "✅ تم تفعيل الترحيب.")
 
 
-def set_welcome(message):
+@bot.message_handler(func=lambda m: m.text == "تعطيل الترحيب")
+def disable_welcome(message):
     if not is_group(message):
         return
-    if not has_high_rank(message.chat.id, message.from_user.id):
-        return high_only(message)
+    if not has_admin_power(message.chat.id, message.from_user.id):
+        return admin_only(message)
+
+    groups = load_groups()
+    groups[str(message.chat.id)]["welcome_enabled"] = False
+    save_groups(groups)
+    bot.reply_to(message, "✅ تم تعطيل الترحيب.")
+
+
+@bot.message_handler(func=lambda m: m.text and m.text.startswith("وضع ترحيب "))
+def set_welcome_text(message):
+    if not is_group(message):
+        return
+    if not has_admin_power(message.chat.id, message.from_user.id):
+        return admin_only(message)
 
     text = message.text.replace("وضع ترحيب ", "", 1).strip()
     if not text:
         return bot.reply_to(message, "❌ اكتب النص بعد الأمر.")
 
     groups = load_groups()
-    gid = str(message.chat.id)
-    groups[gid]["welcome_text"] = text
+    groups[str(message.chat.id)]["welcome_text"] = text
     save_groups(groups)
-    bot.reply_to(message, "✅ تم حفظ رسالة الترحيب.")
+    bot.reply_to(message, "✅ تم حفظ الترحيب.")
 
 
-def delete_welcome(message):
+@bot.message_handler(func=lambda m: m.text == "حذف الترحيب")
+def delete_welcome_text(message):
     if not is_group(message):
         return
-    if not has_high_rank(message.chat.id, message.from_user.id):
-        return high_only(message)
+    if not has_admin_power(message.chat.id, message.from_user.id):
+        return admin_only(message)
 
     groups = load_groups()
-    gid = str(message.chat.id)
-    groups[gid]["welcome_text"] = "أهلاً بك {name} في {group}"
+    groups[str(message.chat.id)]["welcome_text"] = "اهلاً {name} نورت {group} 🌿"
     save_groups(groups)
     bot.reply_to(message, "✅ تم حذف الترحيب المخصص.")
 
 
+@bot.message_handler(func=lambda m: m.text and m.text.startswith("تعيين القوانين "))
 def set_rules(message):
     if not is_group(message):
         return
-    if not has_high_rank(message.chat.id, message.from_user.id):
-        return high_only(message)
+    if not has_admin_power(message.chat.id, message.from_user.id):
+        return admin_only(message)
 
     text = message.text.replace("تعيين القوانين ", "", 1).strip()
     groups = load_groups()
@@ -1179,11 +998,22 @@ def set_rules(message):
     bot.reply_to(message, "✅ تم حفظ القوانين.")
 
 
+@bot.message_handler(func=lambda m: m.text == "عرض القوانين")
+def show_rules(message):
+    if not is_group(message):
+        return
+    data = get_group_data(message.chat.id)
+    if not data["rules"]:
+        return bot.reply_to(message, "❌ لا توجد قوانين.")
+    bot.reply_to(message, f"📜 القوانين:\n{data['rules']}")
+
+
+@bot.message_handler(func=lambda m: m.text == "حذف القوانين")
 def delete_rules(message):
     if not is_group(message):
         return
-    if not has_high_rank(message.chat.id, message.from_user.id):
-        return high_only(message)
+    if not has_admin_power(message.chat.id, message.from_user.id):
+        return admin_only(message)
 
     groups = load_groups()
     groups[str(message.chat.id)]["rules"] = ""
@@ -1191,20 +1021,12 @@ def delete_rules(message):
     bot.reply_to(message, "✅ تم حذف القوانين.")
 
 
-def show_rules(message):
-    if not is_group(message):
-        return
-    data = get_group_data(message.chat.id)
-    if not data["rules"]:
-        return bot.reply_to(message, "❌ لا توجد قوانين محفوظة.")
-    bot.reply_to(message, f"📜 القوانين:\n{data['rules']}")
-
-
+@bot.message_handler(func=lambda m: m.text and m.text.startswith("تعيين وصف "))
 def set_description(message):
     if not is_group(message):
         return
-    if not has_high_rank(message.chat.id, message.from_user.id):
-        return high_only(message)
+    if not has_admin_power(message.chat.id, message.from_user.id):
+        return admin_only(message)
 
     text = message.text.replace("تعيين وصف ", "", 1).strip()
     groups = load_groups()
@@ -1213,15 +1035,17 @@ def set_description(message):
     bot.reply_to(message, "✅ تم حفظ الوصف.")
 
 
+@bot.message_handler(func=lambda m: m.text == "عرض الوصف")
 def show_description(message):
     if not is_group(message):
         return
     data = get_group_data(message.chat.id)
     if not data["description"]:
-        return bot.reply_to(message, "❌ لا يوجد وصف محفوظ.")
+        return bot.reply_to(message, "❌ لا يوجد وصف.")
     bot.reply_to(message, f"📝 الوصف:\n{data['description']}")
 
 
+@bot.message_handler(func=lambda m: m.text == "عرض الاعدادات")
 def show_settings(message):
     if not is_group(message):
         return
@@ -1231,27 +1055,36 @@ def show_settings(message):
     text = (
         f"• الترحيب: {'مفعل' if data['welcome_enabled'] else 'معطل'}\n"
         f"• الروابط: {'مقفول' if locks['links'] else 'مفتوح'}\n"
-        f"• المعرف: {'مقفول' if locks['username'] else 'مفتوح'}\n"
-        f"• التاك: {'مقفول' if locks['tag'] else 'مفتوح'}\n"
         f"• الصور: {'مقفول' if locks['photos'] else 'مفتوح'}\n"
-        f"• الفيديو: {'مقفول' if locks['video'] else 'مفتوح'}\n"
-        f"• الصوت: {'مقفول' if locks['voice'] else 'مفتوح'}\n"
-        f"• الصوتيات: {'مقفول' if locks['audio'] else 'مفتوح'}\n"
-        f"• الملفات: {'مقفول' if locks['files'] else 'مفتوح'}\n"
+        f"• الفيديو: {'مقفول' if locks['videos'] else 'مفتوح'}\n"
         f"• الملصقات: {'مقفول' if locks['stickers'] else 'مفتوح'}\n"
-        f"• المتحركة: {'مقفول' if locks['gif'] else 'مفتوح'}\n"
-        f"• التوجيه: {'مقفول' if locks['forward'] else 'مفتوح'}\n"
+        f"• التوجيه: {'مقفول' if locks['forwards'] else 'مفتوح'}\n"
         f"• البوتات: {'مقفول' if locks['bots'] else 'مفتوح'}\n"
-        f"• الدردشة: {'مقفول' if locks['chat'] else 'مفتوح'}"
+        f"• الدردشة: {'مقفول' if locks['chat'] else 'مفتوح'}\n"
+        f"• المعرف: {'مقفول' if locks['usernames'] else 'مفتوح'}"
     )
     bot.reply_to(message, text)
 
 
-def handle_welcome(message):
+# =========================
+# ترحيب تلقائي
+# =========================
+@bot.message_handler(content_types=["new_chat_members"])
+def welcome_new_members(message):
     if not is_group(message):
         return
 
+    ensure_group(message.chat)
     data = get_group_data(message.chat.id)
+
+    if data["locks"]["bots"]:
+        for member in message.new_chat_members:
+            if member.is_bot:
+                try:
+                    bot.ban_chat_member(message.chat.id, member.id)
+                except:
+                    pass
+
     if not data["welcome_enabled"]:
         return
 
@@ -1260,44 +1093,79 @@ def handle_welcome(message):
         text = text.replace("{name}", member.first_name or "عضو")
         text = text.replace("{group}", message.chat.title or "المجموعة")
         try:
+            with open("welcome.jpg", "rb") as photo:
+                bot.send_photo(message.chat.id, photo, caption=text)
+        except:
             bot.send_message(message.chat.id, text)
-        except:
-            pass
 
 
 # =========================
-# Dev
+# الحماية التلقائية
 # =========================
-def count_users(message):
-    if not is_dev(message.from_user.id):
-        return bot.reply_to(message, "❌ هذا الأمر فقط للمطور.")
-    users = load_users()
-    bot.reply_to(message, f"👤 عدد المستخدمين: {len(users)}")
+@bot.message_handler(content_types=["text", "photo", "video", "sticker", "document", "audio", "voice"])
+def auto_protection(message):
+    ensure_user(message.from_user)
+    if is_group(message):
+        ensure_group(message.chat)
 
+    if not is_group(message):
+        return
 
-def count_groups(message):
-    if not is_dev(message.from_user.id):
-        return bot.reply_to(message, "❌ هذا الأمر فقط للمطور.")
     groups = load_groups()
-    bot.reply_to(message, f"👥 عدد الكروبات: {len(groups)}")
+    gid = str(message.chat.id)
 
-
-def broadcast_message(message):
-    if not is_dev(message.from_user.id):
-        return bot.reply_to(message, "❌ هذا الأمر فقط للمطور.")
-    text = message.text.replace("اذاعة ", "", 1).strip()
-    if not text:
-        return bot.reply_to(message, "❌ اكتب النص بعد اذاعة")
-
-    users = load_users()
-    sent = 0
-    for uid in users.keys():
+    # حذف تلقائي لرسائل المكتوم
+    if str(message.from_user.id) in groups[gid]["muted"]:
         try:
-            bot.send_message(int(uid), text)
-            sent += 1
+            bot.delete_message(message.chat.id, message.message_id)
         except:
             pass
-    bot.reply_to(message, f"✅ تمت الاذاعة إلى {sent} مستخدم.")
+        return
+
+    if has_admin_power(message.chat.id, message.from_user.id):
+        return
+
+    data = get_group_data(message.chat.id)
+    locks = data["locks"]
+
+    try:
+        if message.content_type == "text":
+            txt = message.text or ""
+
+            if locks["chat"]:
+                bot.delete_message(message.chat.id, message.message_id)
+                return
+
+            if locks["links"] and re.search(r"(https?://|t\.me/|www\.)", txt, re.IGNORECASE):
+                bot.delete_message(message.chat.id, message.message_id)
+                return
+
+            if locks["usernames"] and "@" in txt:
+                bot.delete_message(message.chat.id, message.message_id)
+                return
+
+            if (getattr(message, "forward_from", None) or getattr(message, "forward_from_chat", None)) and locks["forwards"]:
+                bot.delete_message(message.chat.id, message.message_id)
+                return
+
+        if message.content_type == "photo" and locks["photos"]:
+            bot.delete_message(message.chat.id, message.message_id)
+            return
+
+        if message.content_type == "video" and locks["videos"]:
+            bot.delete_message(message.chat.id, message.message_id)
+            return
+
+        if message.content_type == "sticker" and locks["stickers"]:
+            bot.delete_message(message.chat.id, message.message_id)
+            return
+
+        if (getattr(message, "forward_from", None) or getattr(message, "forward_from_chat", None)) and locks["forwards"]:
+            bot.delete_message(message.chat.id, message.message_id)
+            return
+
+    except:
+        pass
 
 
 print("Bot is running...")
