@@ -9,11 +9,12 @@ BOT_TOKEN = "8667177884:AAFiV6hCpSX2AMyqi9apiiXo0UavZDNan74"
 BOT_USERNAME = "Fadifvbot"
 DEV_USERNAME = "fvamv"
 CHANNEL_USERNAME = "fadifva"
+OWNER_ID = 8065884629  # حط ايديك هنا
 
 bot = telebot.TeleBot(BOT_TOKEN, parse_mode="HTML")
 
 # =========================
-# تجهيز الملفات
+# ملفات الداتا
 # =========================
 if not os.path.exists("data"):
     os.makedirs("data")
@@ -68,7 +69,7 @@ def save_ranks(data):
 
 
 # =========================
-# تهيئة بيانات
+# الداتا الافتراضية
 # =========================
 DEFAULT_LOCKS = {
     "links": False,
@@ -107,6 +108,7 @@ def ensure_user(user):
 def ensure_group(chat):
     groups = load_groups()
     gid = str(chat.id)
+
     if gid not in groups:
         groups[gid] = {
             "welcome_enabled": False,
@@ -152,7 +154,9 @@ def is_subscribed(user_id):
 
 def force_sub(message):
     markup = types.InlineKeyboardMarkup()
-    markup.add(types.InlineKeyboardButton("📢 اشترك بالقناة", url=f"https://t.me/{CHANNEL_USERNAME}"))
+    markup.add(
+        types.InlineKeyboardButton("📢 اشترك بالقناة", url=f"https://t.me/{CHANNEL_USERNAME}")
+    )
     bot.reply_to(
         message,
         f"🚀 لازم تشترك بالقناة حتى تستخدم البوت:\nhttps://t.me/{CHANNEL_USERNAME}",
@@ -172,6 +176,7 @@ def get_local_rank(chat_id, user_id):
     ranks = load_ranks()
     gid = str(chat_id)
     uid = str(user_id)
+
     if gid not in ranks:
         return None
     if uid in ranks[gid].get("owners", []):
@@ -211,6 +216,7 @@ def get_target_user(message):
                 self.id = int(uid)
                 self.first_name = str(uid)
         return TempUser(parts[1])
+
     return None
 
 
@@ -235,9 +241,9 @@ def mute_permissions():
 def unmute_permissions():
     return types.ChatPermissions(
         can_send_messages=True,
+        can_send_media_messages=True,
         can_send_other_messages=True,
-        can_add_web_page_previews=True,
-        can_send_media_messages=True
+        can_add_web_page_previews=True
     )
 
 
@@ -274,6 +280,13 @@ def set_lock(chat_id, key, state):
     save_groups(groups)
 
 
+def notify_owner(text):
+    try:
+        bot.send_message(OWNER_ID, text)
+    except:
+        pass
+
+
 # =========================
 # الأزرار
 # =========================
@@ -298,11 +311,19 @@ def back_markup():
 
 
 # =========================
-# ستارت
+# /start
 # =========================
 @bot.message_handler(commands=["start"])
 def start_command(message):
     ensure_user(message.from_user)
+
+    username = f"@{message.from_user.username}" if message.from_user.username else "لا يوجد"
+    notify_owner(
+        "📥 شخص دخل البوت\n\n"
+        f"• الاسم: {message.from_user.first_name}\n"
+        f"• اليوزر: {username}\n"
+        f"• الايدي: <code>{message.from_user.id}</code>"
+    )
 
     if not is_subscribed(message.from_user.id):
         return force_sub(message)
@@ -328,7 +349,7 @@ def start_command(message):
 
 
 # =========================
-# القوائم
+# قائمة الأوامر
 # =========================
 @bot.message_handler(func=lambda m: m.text and m.text.strip() in ["الاوامر", "اوامر", "/help"])
 def show_main_menu(message):
@@ -447,35 +468,27 @@ def callback_handler(call):
 ━━━━━━━━━━━━"""
     }
 
-    main_text = (
-        "• قائمة الأوامر :\n\n"
-        "━━━━━━━━━━━━\n"
-        "1- أوامر الادمنية\n"
-        "2- أوامر الرفع والتنزيل\n"
-        "3- أوامر القفل والفتح\n"
-        "4- أوامر الإعدادات\n"
-        "5- أوامر التسلية\n"
-        "6- أوامر Dev\n"
-        "7- الأوامر الخدمية\n"
-        "━━━━━━━━━━━━"
-    )
-
     try:
         if call.data == "back_main":
-            bot.edit_message_text(
-                text=main_text,
-                chat_id=call.message.chat.id,
-                message_id=call.message.message_id,
-                reply_markup=main_menu_markup()
+            text = (
+                "• قائمة الأوامر :\n\n"
+                "━━━━━━━━━━━━\n"
+                "1- أوامر الادمنية\n"
+                "2- أوامر الرفع والتنزيل\n"
+                "3- أوامر القفل والفتح\n"
+                "4- أوامر الإعدادات\n"
+                "5- أوامر التسلية\n"
+                "6- أوامر Dev\n"
+                "7- الأوامر الخدمية\n"
+                "━━━━━━━━━━━━"
             )
+            bot.send_message(call.message.chat.id, text, reply_markup=main_menu_markup())
+
         elif call.data in sections:
-            bot.edit_message_text(
-                text=sections[call.data],
-                chat_id=call.message.chat.id,
-                message_id=call.message.message_id,
-                reply_markup=back_markup()
-            )
+            bot.send_message(call.message.chat.id, sections[call.data], reply_markup=back_markup())
+
         bot.answer_callback_query(call.id)
+
     except Exception as e:
         print("Callback Error:", e)
         try:
@@ -525,6 +538,7 @@ def group_link(message):
         return
     if not has_admin_power(message.chat.id, message.from_user.id):
         return admin_only(message)
+
     try:
         link = bot.export_chat_invite_link(message.chat.id)
         bot.reply_to(message, f"🔗 رابط المجموعة:\n{link}")
@@ -533,7 +547,7 @@ def group_link(message):
 
 
 # =========================
-# الرفع والتنزيل
+# رفع وتنزيل
 # =========================
 @bot.message_handler(func=lambda m: m.text == "رفع مالك")
 def raise_owner(message):
@@ -869,7 +883,7 @@ def clear_banned(message):
 
 
 # =========================
-# القفل والفتح
+# قفل وفتح
 # =========================
 @bot.message_handler(func=lambda m: m.text and m.text.startswith("قفل "))
 def lock_command(message):
@@ -926,7 +940,7 @@ def unlock_command(message):
 
 
 # =========================
-# الاعدادات
+# الإعدادات
 # =========================
 @bot.message_handler(func=lambda m: m.text == "تفعيل الترحيب")
 def enable_welcome(message):
@@ -1002,6 +1016,7 @@ def set_rules(message):
 def show_rules(message):
     if not is_group(message):
         return
+
     data = get_group_data(message.chat.id)
     if not data["rules"]:
         return bot.reply_to(message, "❌ لا توجد قوانين.")
@@ -1039,6 +1054,7 @@ def set_description(message):
 def show_description(message):
     if not is_group(message):
         return
+
     data = get_group_data(message.chat.id)
     if not data["description"]:
         return bot.reply_to(message, "❌ لا يوجد وصف.")
@@ -1049,6 +1065,7 @@ def show_description(message):
 def show_settings(message):
     if not is_group(message):
         return
+
     data = get_group_data(message.chat.id)
     locks = data["locks"]
 
@@ -1067,7 +1084,7 @@ def show_settings(message):
 
 
 # =========================
-# ترحيب تلقائي
+# دخول أعضاء جدد
 # =========================
 @bot.message_handler(content_types=["new_chat_members"])
 def welcome_new_members(message):
@@ -1077,13 +1094,27 @@ def welcome_new_members(message):
     ensure_group(message.chat)
     data = get_group_data(message.chat.id)
 
-    if data["locks"]["bots"]:
-        for member in message.new_chat_members:
-            if member.is_bot:
-                try:
-                    bot.ban_chat_member(message.chat.id, member.id)
-                except:
-                    pass
+    for member in message.new_chat_members:
+        username = f"@{member.username}" if member.username else "لا يوجد"
+        inviter_name = message.from_user.first_name if message.from_user else "غير معروف"
+        inviter_id = message.from_user.id if message.from_user else "غير معروف"
+
+        notify_owner(
+            "🚨 عضو جديد دخل الكروب\n\n"
+            f"• الاسم: {member.first_name}\n"
+            f"• اليوزر: {username}\n"
+            f"• الايدي: <code>{member.id}</code>\n"
+            f"• اسم الكروب: {message.chat.title}\n"
+            f"• ايدي الكروب: <code>{message.chat.id}</code>\n"
+            f"• الشخص الظاهر بالحدث: {inviter_name}\n"
+            f"• ايديه: <code>{inviter_id}</code>"
+        )
+
+        if data["locks"]["bots"] and member.is_bot:
+            try:
+                bot.ban_chat_member(message.chat.id, member.id)
+            except:
+                pass
 
     if not data["welcome_enabled"]:
         return
@@ -1100,7 +1131,7 @@ def welcome_new_members(message):
 
 
 # =========================
-# الحماية التلقائية
+# حماية تلقائية
 # =========================
 @bot.message_handler(content_types=["text", "photo", "video", "sticker", "document", "audio", "voice"])
 def auto_protection(message):
@@ -1114,7 +1145,6 @@ def auto_protection(message):
     groups = load_groups()
     gid = str(message.chat.id)
 
-    # حذف تلقائي لرسائل المكتوم
     if str(message.from_user.id) in groups[gid]["muted"]:
         try:
             bot.delete_message(message.chat.id, message.message_id)
@@ -1157,10 +1187,6 @@ def auto_protection(message):
             return
 
         if message.content_type == "sticker" and locks["stickers"]:
-            bot.delete_message(message.chat.id, message.message_id)
-            return
-
-        if (getattr(message, "forward_from", None) or getattr(message, "forward_from_chat", None)) and locks["forwards"]:
             bot.delete_message(message.chat.id, message.message_id)
             return
 
