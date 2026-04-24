@@ -6,9 +6,10 @@ from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
 
 TOKEN = "8516176029:AAH-s3Y0nLAdmQN_LyeR3aS-tbK1XInMINY"
 
+OWNER_ID = 8065884629
 BOT_USERNAME = "fadifvambot"
 DEV_USERNAME = "fvamv"
-FORCE_CHANNEL = "@fadifva"
+FORCE_CHANNEL = "fadifva"
 
 bot = telebot.TeleBot(TOKEN, parse_mode="HTML")
 
@@ -17,7 +18,11 @@ DATA_FILE = "data.json"
 DEFAULT_DATA = {
     "locks": {},
     "ranks": {},
-    "muted": {}
+    "muted": {},
+    "users": {},
+    "groups": {},
+    "replies": {},
+    "notify": True
 }
 
 
@@ -26,7 +31,12 @@ def load_data():
         save_data(DEFAULT_DATA)
     try:
         with open(DATA_FILE, "r", encoding="utf-8") as f:
-            return json.load(f)
+            d = json.load(f)
+        for k, v in DEFAULT_DATA.items():
+            if k not in d:
+                d[k] = v
+        save_data(d)
+        return d
     except:
         save_data(DEFAULT_DATA)
         return DEFAULT_DATA.copy()
@@ -38,6 +48,7 @@ def save_data(data):
 
 
 data = load_data()
+waiting_reply = {}
 
 
 def chat_id_str(chat_id):
@@ -46,6 +57,41 @@ def chat_id_str(chat_id):
 
 def user_id_str(user_id):
     return str(user_id)
+
+
+def register_user(message):
+    if not message.from_user:
+        return
+
+    uid = user_id_str(message.from_user.id)
+
+    if uid not in data["users"]:
+        data["users"][uid] = {
+            "name": message.from_user.first_name or "",
+            "username": message.from_user.username or ""
+        }
+        save_data(data)
+
+        if data.get("notify", True):
+            try:
+                bot.send_message(
+                    OWNER_ID,
+                    f"🔔 دخول مستخدم جديد للبوت\n\n"
+                    f"👤 الاسم: {message.from_user.first_name}\n"
+                    f"🔗 اليوزر: @{message.from_user.username}\n"
+                    f"🆔 الايدي: {message.from_user.id}"
+                )
+            except:
+                pass
+
+    if message.chat.type in ["group", "supergroup"]:
+        cid = chat_id_str(message.chat.id)
+        if cid not in data["groups"]:
+            data["groups"][cid] = {
+                "title": message.chat.title or "",
+                "username": message.chat.username or ""
+            }
+            save_data(data)
 
 
 def get_locks(chat_id):
@@ -117,7 +163,6 @@ def is_admin(chat_id, user_id):
         member = bot.get_chat_member(chat_id, user_id)
         if member.status in ["creator", "administrator"]:
             return True
-
         rank = get_rank(chat_id, user_id)
         return rank in ["مالك اساسي", "مالك", "منشئ", "مدير", "ادمن", "مشرف"]
     except:
@@ -127,11 +172,9 @@ def is_admin(chat_id, user_id):
 def can_use_admin(message):
     if message.chat.type == "private":
         return False
-
     if not is_admin(message.chat.id, message.from_user.id):
         bot.reply_to(message, "❌ هذا الأمر للمشرفين وما فوق فقط")
         return False
-
     return True
 
 
@@ -152,6 +195,20 @@ def main_menu():
     return kb
 
 
+def owner_panel():
+    kb = InlineKeyboardMarkup(row_width=2)
+    kb.add(
+        InlineKeyboardButton("➕ أضف رد", callback_data="owner_add_reply"),
+        InlineKeyboardButton("📜 الردود", callback_data="owner_replies"),
+        InlineKeyboardButton("🗑 حذف رد", callback_data="owner_del_reply"),
+        InlineKeyboardButton("👥 المستخدمين", callback_data="owner_users"),
+        InlineKeyboardButton("📊 الكروبات", callback_data="owner_groups"),
+        InlineKeyboardButton("🔔 إشعار الدخول", callback_data="owner_notify"),
+        InlineKeyboardButton("📚 أوامر البوت", callback_data="commands")
+    )
+    return kb
+
+
 def start_buttons():
     kb = InlineKeyboardMarkup()
     kb.add(InlineKeyboardButton("👨‍💻 المطور", url=f"https://t.me/{DEV_USERNAME}"))
@@ -164,19 +221,15 @@ def start_buttons():
 HELP_ADMIN = """
 <b>أوامر الإدارة</b>
 
-<b>أوامر فعّالة بالرد:</b>
-• حظر
-• الغاء الحظر
-• طرد
-• كتم
-• الغاء الكتم
-• مسح
-
-<b>أوامر المسح:</b>
-• مسح 10
+• حظر بالرد
+• الغاء الحظر بالرد
+• طرد بالرد
+• كتم بالرد
+• الغاء الكتم بالرد
 • مسح بالرد
+• مسح 10
 
-<b>أوامر الرتب بالرد:</b>
+<b>الرتب بالرد:</b>
 • رفع مالك اساسي
 • رفع مالك
 • رفع منشئ
@@ -202,35 +255,27 @@ HELP_LOCKS = """
 
 • قفل الروابط
 • فتح الروابط
-
 • قفل الصور
 • فتح الصور
-
 • قفل الفيديو
 • فتح الفيديو
-
 • قفل الملصقات
 • فتح الملصقات
-
 • قفل التوجيه
 • فتح التوجيه
-
 • قفل البوتات
 • فتح البوتات
-
 • قفل الكل
 • فتح الكل
-
-ملاحظة: لازم البوت يكون مشرف وعنده صلاحية حذف الرسائل.
 """
 
 HELP_MUSIC = """
 <b>أوامر الميوزك</b>
 
-• يوت فيروز
+• يوت سيف عامر شجرة
 • يوت اسم الاغنية
 
-يرسل الأغنية كصوت داخل الكروب أو الخاص.
+يرسل الأغنية كصوت.
 """
 
 HELP_FUN = """
@@ -268,14 +313,23 @@ HELP_DEV = f"""
 
 @bot.message_handler(commands=["start"])
 def start(message):
+    register_user(message)
+
     if not check_sub(message):
         return
 
-    bot.send_message(
-        message.chat.id,
-        "أهلاً بك في بوت فادي المطور 🌷\nاختر من الأزرار بالأسفل 👇",
-        reply_markup=start_buttons()
-    )
+    if message.from_user.id == OWNER_ID:
+        bot.send_message(
+            message.chat.id,
+            "⚙️ <b>لوحة تحكم المطور</b>\n\nاختر من الأزرار:",
+            reply_markup=owner_panel()
+        )
+    else:
+        bot.send_message(
+            message.chat.id,
+            "أهلاً بك في بوت فادي المطور 🌷\nاختر من الأزرار بالأسفل 👇",
+            reply_markup=start_buttons()
+        )
 
 
 @bot.callback_query_handler(func=lambda call: True)
@@ -308,9 +362,55 @@ def callbacks(call):
     elif call.data == "help_dev":
         bot.edit_message_text(HELP_DEV, call.message.chat.id, call.message.message_id, reply_markup=main_menu())
 
+    elif call.data.startswith("owner_"):
+        if call.from_user.id != OWNER_ID:
+            return bot.answer_callback_query(call.id, "❌ هذه اللوحة للمطور فقط", show_alert=True)
+
+        if call.data == "owner_add_reply":
+            waiting_reply[call.from_user.id] = {"step": "add_word"}
+            bot.send_message(call.message.chat.id, "✏️ اكتب الكلمة التي تريد البوت يرد عليها:\nمثال: هلو")
+
+        elif call.data == "owner_del_reply":
+            waiting_reply[call.from_user.id] = {"step": "del_word"}
+            bot.send_message(call.message.chat.id, "🗑 اكتب الكلمة التي تريد حذف ردها:")
+
+        elif call.data == "owner_replies":
+            if not data["replies"]:
+                txt = "📜 لا توجد ردود مضافة."
+            else:
+                txt = "📜 <b>الردود المضافة:</b>\n\n"
+                for i, word in enumerate(data["replies"].keys(), 1):
+                    txt += f"{i}. {word}\n"
+            bot.send_message(call.message.chat.id, txt)
+
+        elif call.data == "owner_users":
+            txt = f"👥 عدد المستخدمين: {len(data['users'])}\n\n"
+            for uid, info in list(data["users"].items())[-20:]:
+                username = info.get("username") or "بدون"
+                name = info.get("name") or "بدون"
+                txt += f"• {name} | @{username} | <code>{uid}</code>\n"
+            bot.send_message(call.message.chat.id, txt)
+
+        elif call.data == "owner_groups":
+            txt = f"📊 عدد الكروبات: {len(data['groups'])}\n\n"
+            for cid, info in data["groups"].items():
+                title = info.get("title") or "بدون اسم"
+                username = info.get("username")
+                link = f"https://t.me/{username}" if username else "لا يوجد رابط عام"
+                txt += f"• {title}\n{link}\n<code>{cid}</code>\n\n"
+            bot.send_message(call.message.chat.id, txt)
+
+        elif call.data == "owner_notify":
+            data["notify"] = not data.get("notify", True)
+            save_data(data)
+            status = "مفعل ✅" if data["notify"] else "متوقف ❌"
+            bot.send_message(call.message.chat.id, f"🔔 إشعار الدخول: {status}")
+
 
 @bot.message_handler(content_types=["new_chat_members"])
 def welcome(message):
+    register_user(message)
+
     for u in message.new_chat_members:
         if u.is_bot:
             locks = get_locks(message.chat.id)
@@ -330,6 +430,8 @@ def welcome(message):
 
 @bot.message_handler(content_types=["text", "photo", "video", "sticker", "document", "audio", "voice"])
 def handler(message):
+    register_user(message)
+
     if message.chat.type != "private":
         if not check_sub(message):
             return
@@ -384,7 +486,39 @@ def handler(message):
     if not text:
         return
 
-    if text in ["الاوامر", "الأوامر", "اوامر"]:
+    if message.from_user.id in waiting_reply:
+        state = waiting_reply[message.from_user.id]
+
+        if state["step"] == "add_word":
+            waiting_reply[message.from_user.id] = {"step": "add_answer", "word": text}
+            bot.reply_to(message, "💬 هسه اكتب الرد على هاي الكلمة:")
+
+        elif state["step"] == "add_answer":
+            word = state["word"]
+            data["replies"][word] = text
+            save_data(data)
+            del waiting_reply[message.from_user.id]
+            bot.reply_to(message, f"✅ تم إضافة رد جديد:\nالكلمة: {word}\nالرد: {text}")
+
+        elif state["step"] == "del_word":
+            if text in data["replies"]:
+                del data["replies"][text]
+                save_data(data)
+                bot.reply_to(message, f"✅ تم حذف الرد على: {text}")
+            else:
+                bot.reply_to(message, "❌ ماكو رد محفوظ على هاي الكلمة")
+            del waiting_reply[message.from_user.id]
+
+        return
+
+    if text in data["replies"]:
+        bot.reply_to(message, data["replies"][text])
+        return
+
+    if text in ["لوحة", "لوحه", "panel"] and message.from_user.id == OWNER_ID:
+        bot.reply_to(message, "⚙️ لوحة تحكم المطور", reply_markup=owner_panel())
+
+    elif text in ["الاوامر", "الأوامر", "اوامر"]:
         bot.reply_to(message, "📚 اختر قسم الأوامر:", reply_markup=main_menu())
 
     elif text == "سورس":
@@ -403,7 +537,6 @@ def handler(message):
     elif text in ["حظر", "طرد", "كتم", "الغاء الكتم", "الغاء الحظر"]:
         if not can_use_admin(message):
             return
-
         user = target_user(message)
         if not user:
             return
@@ -452,7 +585,6 @@ def handler(message):
     elif text == "مسح" or text == "مسح بالرد":
         if not can_use_admin(message):
             return
-
         if message.reply_to_message:
             try:
                 bot.delete_message(message.chat.id, message.reply_to_message.message_id)
@@ -465,7 +597,6 @@ def handler(message):
     elif text.startswith("مسح "):
         if not can_use_admin(message):
             return
-
         try:
             count = int(text.split()[1])
             count = min(count, 100)
@@ -480,38 +611,28 @@ def handler(message):
     elif text.startswith("رفع "):
         if not can_use_admin(message):
             return
-
         user = target_user(message)
         if not user:
             return
-
         rank = text.replace("رفع ", "").strip()
-        allowed = [
-            "مالك اساسي", "مالك", "منشئ", "مدير", "ادمن", "مشرف", "مميز",
-            "هطف", "حمار", "كلب", "خروف", "بقلبي"
-        ]
-
+        allowed = ["مالك اساسي", "مالك", "منشئ", "مدير", "ادمن", "مشرف", "مميز", "هطف", "حمار", "كلب", "خروف", "بقلبي"]
         if rank not in allowed:
             return bot.reply_to(message, "❌ هذه الرتبة غير موجودة")
-
         set_rank(message.chat.id, user.id, rank)
         bot.reply_to(message, f"✅ تم رفعه {rank}")
 
     elif text.startswith("تنزيل "):
         if not can_use_admin(message):
             return
-
         user = target_user(message)
         if not user:
             return
-
         del_rank(message.chat.id, user.id)
         bot.reply_to(message, "✅ تم تنزيل رتبته")
 
     elif text == "تنزيل الكل":
         if not can_use_admin(message):
             return
-
         cid = chat_id_str(message.chat.id)
         data["ranks"][cid] = {}
         save_data(data)
@@ -520,7 +641,6 @@ def handler(message):
     elif text.startswith("قفل "):
         if not can_use_admin(message):
             return
-
         name = text.replace("قفل ", "").strip()
         mapping = {
             "الروابط": "links",
@@ -531,7 +651,6 @@ def handler(message):
             "البوتات": "bots",
             "الكل": "all"
         }
-
         if name in mapping:
             locks[mapping[name]] = True
             save_data(data)
@@ -542,7 +661,6 @@ def handler(message):
     elif text.startswith("فتح "):
         if not can_use_admin(message):
             return
-
         name = text.replace("فتح ", "").strip()
         mapping = {
             "الروابط": "links",
@@ -553,7 +671,6 @@ def handler(message):
             "البوتات": "bots",
             "الكل": "all"
         }
-
         if name in mapping:
             locks[mapping[name]] = False
             save_data(data)
@@ -564,7 +681,6 @@ def handler(message):
     elif text in ["زواج", "طلاق"]:
         if not message.reply_to_message:
             return bot.reply_to(message, "رد على شخص حتى يتم الأمر")
-
         if text == "زواج":
             bot.reply_to(message, f"💍 تم الزواج بينك وبين {message.reply_to_message.from_user.first_name}")
         else:
@@ -575,68 +691,55 @@ def handler(message):
         if not query:
             return bot.reply_to(message, "اكتب اسم الأغنية بعد يوت")
 
-        wait = bot.reply_to(message, "🔎 جاري البحث عن الأغنية...")
+        wait = bot.reply_to(message, "🔎 جاري البحث...")
 
         try:
-            safe_id = f"{message.chat.id}_{message.message_id}"
-            filename_template = f"music_{safe_id}.%(ext)s"
-
             ydl_opts = {
-                "format": "bestaudio[filesize<45M]/bestaudio/best",
-                "outtmpl": filename_template,
-                "quiet": False,
+                "format": "bestaudio/best",
+                "quiet": True,
                 "noplaylist": True,
                 "default_search": "ytsearch1",
-                "socket_timeout": 60,
-                "retries": 10,
-                "fragment_retries": 10,
-                "nocheckcertificate": True,
                 "geo_bypass": True,
+                "nocheckcertificate": True,
                 "extractor_args": {
                     "youtube": {
-                        "player_client": ["android", "web"]
+                        "player_client": ["android", "ios", "web"]
                     }
                 },
                 "http_headers": {
-                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
+                    "User-Agent": "com.google.android.youtube/17.31.35 (Linux; U; Android 11)"
                 }
             }
 
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                info = ydl.extract_info(query, download=True)
+                info = ydl.extract_info(query, download=False)
 
                 if "entries" in info:
                     info = info["entries"][0]
 
-                filename = ydl.prepare_filename(info)
-                title = info.get("title", "Audio")
-
-            bot.edit_message_text(
-                "🎧 جاري إرسال الأغنية...",
-                message.chat.id,
-                wait.message_id
-            )
-
-            with open(filename, "rb") as audio:
-                bot.send_audio(
-                    message.chat.id,
-                    audio,
-                    title=title,
-                    performer="Aurelius"
-                )
+                audio_url = info["url"]
+                title = info.get("title", query)
+                duration = info.get("duration", 0)
 
             try:
-                os.remove(filename)
+                bot.delete_message(message.chat.id, wait.message_id)
             except:
                 pass
+
+            bot.send_audio(
+                message.chat.id,
+                audio_url,
+                title=title,
+                performer="Aurelius",
+                duration=duration
+            )
 
         except Exception as e:
             print("MUSIC ERROR:", e)
             bot.reply_to(
                 message,
-                "❌ صار خطأ أثناء جلب الأغنية.\n"
-                "جرّب تكتب الاسم أوضح مثل:\n"
-                "يوت فيروز سألوني الناس"
+                "❌ يوتيوب حاظر السيرفر حالياً.\n"
+                "جرّب اسم ثاني أو نحتاج VPS/API حتى يشتغل بثبات."
             )
 
 
