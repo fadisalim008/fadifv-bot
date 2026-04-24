@@ -9,7 +9,7 @@ TOKEN = "8516176029:AAH-s3Y0nLAdmQN_LyeR3aS-tbK1XInMINY"
 OWNER_ID = 8065884629
 BOT_USERNAME = "fadifvambot"
 DEV_USERNAME = "fvamv"
-FORCE_CHANNEL = "fadifva"
+FORCE_CHANNEL = "@fadifva"
 
 bot = telebot.TeleBot(TOKEN, parse_mode="HTML")
 
