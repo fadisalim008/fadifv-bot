@@ -1,10 +1,12 @@
 import os
 import json
 import telebot
-import yt_dlp
+import requests
 from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
 
 TOKEN = "8516176029:AAH-s3Y0nLAdmQN_LyeR3aS-tbK1XInMINY"
+RAPID_API_KEY = ""8d1aaa7799mshaeb22e8130d13c2p169c25jsnf375a4b0af2b"
+ https://rapidapi.com/zayviusdigital/api/yt-search-and-download-mp3/playground/apiendpoint_ae2beb99-211c-415d-a1c0-9e0a4d6dbad8#:~:text=x%2Drapidapi%2Dkey%3A-,8d1aaa7799mshaeb22e8130d13c2p169c25jsnf375a4b0af2b,-%27"
 
 OWNER_ID = 8065884629
 BOT_USERNAME = "fadifvambot"
@@ -258,7 +260,7 @@ HELP_MUSIC = """
 • يوت سيف عامر شجرة
 • يوت اسم الاغنية
 
-يرسل الأغنية كصوت.
+يرسل الأغنية كصوت من API.
 """
 
 HELP_FUN = """
@@ -673,57 +675,48 @@ def handler(message):
         wait = bot.reply_to(message, "🔎 جاري البحث عن الأغنية...")
 
         try:
-            safe_id = f"{message.chat.id}_{message.message_id}"
-            filename_template = f"music_{safe_id}.%(ext)s"
+            url = "https://yt-search-and-download-mp3.p.rapidapi.com/mp3"
 
-            ydl_opts = {
-                "format": "bestaudio/best",
-                "outtmpl": filename_template,
-                "quiet": True,
-                "noplaylist": True,
-                "default_search": "ytsearch1",
-                "cookiefile": "cookies.txt",
-                "geo_bypass": True,
-                "nocheckcertificate": True,
-                "retries": 10,
-                "fragment_retries": 10
+            headers = {
+                "X-RapidAPI-Key": RAPID_API_KEY,
+                "X-RapidAPI-Host": "yt-search-and-download-mp3.p.rapidapi.com"
             }
 
-            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                info = ydl.extract_info(query, download=True)
+            params = {"q": query}
 
-                if "entries" in info:
-                    info = info["entries"][0]
+            res = requests.get(url, headers=headers, params=params, timeout=60)
+            api_data = res.json()
 
-                filename = ydl.prepare_filename(info)
-                title = info.get("title", query)
-                duration = info.get("duration", 0)
+            print("API RESPONSE:", api_data)
+
+            audio_url = (
+                api_data.get("link")
+                or api_data.get("url")
+                or api_data.get("audio")
+                or api_data.get("download")
+            )
+
+            title = api_data.get("title") or query
+
+            if not audio_url:
+                return bot.reply_to(message, "❌ ما حصلت رابط الصوت من الـ API")
 
             try:
                 bot.delete_message(message.chat.id, wait.message_id)
             except:
                 pass
 
-            with open(filename, "rb") as audio:
-                bot.send_audio(
-                    message.chat.id,
-                    audio,
-                    title=title,
-                    performer="Aurelius",
-                    duration=duration
-                )
-
-            try:
-                os.remove(filename)
-            except:
-                pass
+            bot.send_audio(
+                message.chat.id,
+                audio_url,
+                title=title,
+                performer="Aurelius"
+            )
 
         except Exception as e:
-            print("MUSIC ERROR:", e)
-            bot.reply_to(
-                message,
-                "❌ صار خطأ أثناء جلب الأغنية.\nتأكد ملف cookies.txt مرفوع بنفس مكان bot.py"
-            )
+            print("API MUSIC ERROR:", e)
+            bot.reply_to(message, "❌ صار خطأ أثناء جلب الأغنية من API")
+
 
 print("Aurelius bot is running...")
 bot.infinity_polling(skip_pending=True)
