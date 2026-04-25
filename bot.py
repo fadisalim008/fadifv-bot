@@ -5,8 +5,7 @@ import requests
 from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
 
 TOKEN = "8516176029:AAH-s3Y0nLAdmQN_LyeR3aS-tbK1XInMINY"
-RAPID_API_KEY = ""8d1aaa7799mshaeb22e8130d13c2p169c25jsnf375a4b0af2b"
- https://rapidapi.com/zayviusdigital/api/yt-search-and-download-mp3/playground/apiendpoint_ae2beb99-211c-415d-a1c0-9e0a4d6dbad8#:~:text=x%2Drapidapi%2Dkey%3A-,8d1aaa7799mshaeb22e8130d13c2p169c25jsnf375a4b0af2b,-%27"
+RAPID_API_KEY = "8d1aaa7799mshaeb22e8130d13c2p169c25jsnf375a4b0af2b"
 
 OWNER_ID = 8065884629
 BOT_USERNAME = "fadifvambot"
