@@ -674,11 +674,12 @@ def handler(message):
         wait = bot.reply_to(message, "🔎 جاري البحث عن الأغنية...")
 
         try:
+            import re
+
             search_url = "https://www.youtube.com/results"
             search_params = {"search_query": query}
             search_res = requests.get(search_url, params=search_params, timeout=20)
 
-            import re
             video_ids = re.findall(r"watch\?v=(\S{11})", search_res.text)
 
             if not video_ids:
@@ -686,7 +687,7 @@ def handler(message):
 
             youtube_url = f"https://www.youtube.com/watch?v={video_ids[0]}"
 
-            url = "https://yt-search-and-download-mp3.p.rapidapi.com/mp3"
+            api_url = "https://yt-search-and-download-mp3.p.rapidapi.com/mp3"
 
             headers = {
                 "X-RapidAPI-Key": RAPID_API_KEY,
@@ -695,7 +696,7 @@ def handler(message):
 
             params = {"url": youtube_url}
 
-            res = requests.get(url, headers=headers, params=params, timeout=60)
+            res = requests.get(api_url, headers=headers, params=params, timeout=60)
             api_data = res.json()
 
             print("API RESPONSE:", api_data)
@@ -708,7 +709,12 @@ def handler(message):
                 or api_data.get("mp3")
             )
 
-            title = api_data.get("title") or query
+            title = (
+                api_data.get("title")
+                or api_data.get("name")
+                or api_data.get("videoTitle")
+                or query
+            )
 
             if not audio_url:
                 return bot.reply_to(message, "❌ ما حصلت رابط الصوت من الـ API")
@@ -722,7 +728,8 @@ def handler(message):
                 message.chat.id,
                 audio_url,
                 title=title,
-                performer="Aurelius"
+                performer="Aurelius",
+                reply_to_message_id=message.message_id
             )
 
         except Exception as e:
