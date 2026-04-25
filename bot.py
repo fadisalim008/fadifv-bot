@@ -3,7 +3,7 @@ import telebot, requests
 from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
 
 TOKEN = "8516176029:AAH-s3Y0nLAdmQN_LyeR3aS-tbK1XInMINY"
-RAPID_API_KEY = "8d1aaa7799mshaeb22e8130d13c2p169c25jsnf375a4b0af2b"
+RAPID_API_KEY = "8d1aa779mshaeb22e8130d13c2p169c25jsnf375a4b0af2b"
 
 OWNER_ID = 8065884629
 BOT_USERNAME = "fadifvambot"
@@ -16,7 +16,9 @@ DATA_FILE = "data.json"
 DEFAULT_DATA = {
     "locks": {}, "ranks": {}, "muted": {}, "users": {}, "groups": {},
     "replies": {}, "media": {}, "notify": True,
-    "bank": {}, "robbers": {}, "cooldowns": {}
+    "bank": {}, "robbers": {}, "cooldowns": {},
+    "settings": {"welcome": True, "replies": True, "id_photo": True, "games": True},
+    "join_info": {}, "points": {}
 }
 
 waiting_reply = {}
@@ -27,6 +29,7 @@ MEANINGS = [("ما معنى كلمة الغيث؟", "المطر"), ("ما معن
 ARABIC_Q = [("جمع كلمة كتاب؟", "كتب"), ("ضد كلمة طويل؟", "قصير"), ("مرادف كلمة جميل؟", "حسن")]
 RIDDLES = [("له أسنان ولا يعض؟", "المشط"), ("يمشي بلا رجلين؟", "الوقت"), ("بيت بلا أبواب ولا شبابيك؟", "البيضة")]
 CUT_TWEET = ["شنو حلمك؟", "شنو أكثر شي تحبه؟", "منو أقرب شخص إلك؟", "شنو بلد تتمنى تزوره؟"]
+MOVIES = ["The Godfather", "Inception", "Interstellar", "Fight Club", "The Dark Knight", "Gladiator", "Parasite", "Se7en"]
 
 def load_data():
     if not os.path.exists(DATA_FILE):
@@ -48,7 +51,6 @@ def save_data(d):
         json.dump(d, f, ensure_ascii=False, indent=2)
 
 data = load_data()
-
 def sid(x): return str(x)
 
 def register_user(message):
@@ -98,7 +100,11 @@ def check_sub(message):
 def get_locks(chat_id):
     cid = sid(chat_id)
     if cid not in data["locks"]:
-        data["locks"][cid] = {"links": False, "photos": False, "stickers": False, "videos": False, "forward": False, "bots": False, "all": False}
+        data["locks"][cid] = {
+            "links": False, "photos": False, "stickers": False, "videos": False,
+            "forward": False, "bots": False, "all": False, "voice": False,
+            "files": False, "animation": False, "channels": False
+        }
         save_data(data)
     return data["locks"][cid]
 
@@ -106,9 +112,8 @@ def get_rank(chat_id, user_id):
     return data["ranks"].get(sid(chat_id), {}).get(sid(user_id))
 
 def set_rank(chat_id, user_id, rank):
-    cid, uid = sid(chat_id), sid(user_id)
-    data["ranks"].setdefault(cid, {})
-    data["ranks"][cid][uid] = rank
+    data["ranks"].setdefault(sid(chat_id), {})
+    data["ranks"][sid(chat_id)][sid(user_id)] = rank
     save_data(data)
 
 def del_rank(chat_id, user_id):
@@ -195,8 +200,11 @@ HELP_ADMIN = """
 • حظر بالرد
 • طرد بالرد
 • كتم بالرد
+• تقييد 5 / 10 / 30 / 60 / يوم / اسبوع بالرد
 • الغاء الحظر بالرد
 • الغاء الكتم بالرد
+• الغاء التقييد بالرد
+• صلاحياته بالرد
 """
 
 HELP_LOCKS = """
@@ -206,6 +214,9 @@ HELP_LOCKS = """
 • قفل الصور / فتح الصور
 • قفل الفيديو / فتح الفيديو
 • قفل الملصقات / فتح الملصقات
+• قفل الفويسات / فتح الفويسات
+• قفل الملفات / فتح الملفات
+• قفل المتحركات / فتح المتحركات
 • قفل التوجيه / فتح التوجيه
 • قفل البوتات / فتح البوتات
 • قفل الكل / فتح الكل
@@ -228,10 +239,10 @@ HELP_BANK = """
 • مسح حساب بنكي
 • حسابي
 • فلوسي
-• تحويل
+• تحويل + المبلغ بالرد
 • راتب
 • بخشيش
-• زرف
+• زرف بالرد
 • استثمار + المبلغ
 • حظ + المبلغ
 • مضاربه + المبلغ
@@ -256,6 +267,9 @@ HELP_GAMES = """
 • ايموجي
 • ارقام
 • تخمين
+• افلام
+• ز / زوجني
+• طلاق
 """
 
 HELP_MUSIC = """
@@ -275,31 +289,28 @@ HELP_DEV = f"""
 • شراء بوت مشابه
 • الاوامر
 • لوحة
+• تفعيل الايدي
+• تعطيل الايدي
+• منو ضافني
 
 المطور: @{DEV_USERNAME}
 القناة: {FORCE_CHANNEL}
 """
 
 def bank_user(uid):
-    uid = sid(uid)
-    if uid not in data["bank"]:
-        return None
-    return data["bank"][uid]
+    return data["bank"].get(sid(uid))
 
 def create_bank(uid):
     uid = sid(uid)
     if uid in data["bank"]:
         return False
     acc = random.randint(100000, 999999)
-    while any(v.get("account") == acc for v in data["bank"].values()):
-        acc = random.randint(100000, 999999)
     data["bank"][uid] = {"account": acc, "money": 1000}
     save_data(data)
     return True
 
 def cd_ok(uid, key, seconds):
-    uid = sid(uid)
-    now = int(time.time())
+    uid, now = sid(uid), int(time.time())
     data["cooldowns"].setdefault(uid, {})
     last = data["cooldowns"][uid].get(key, 0)
     if now - last < seconds:
@@ -314,25 +325,10 @@ def parse_amount(text):
     except:
         return None
 
-def top_money():
-    items = sorted(data["bank"].items(), key=lambda x: x[1].get("money", 0), reverse=True)[:10]
-    if not items:
-        return "ماكو حسابات بنكية."
-    txt = "🏦 <b>توب الفلوس</b>\n\n"
-    for i, (uid, info) in enumerate(items, 1):
-        name = data["users"].get(uid, {}).get("name", uid)
-        txt += f"{i}. {name} — {info.get('money', 0)}$\n"
-    return txt
-
-def top_robbers():
-    items = sorted(data["robbers"].items(), key=lambda x: x[1], reverse=True)[:10]
-    if not items:
-        return "ماكو حرامية بعد."
-    txt = "🦹 <b>توب الحراميه</b>\n\n"
-    for i, (uid, count) in enumerate(items, 1):
-        name = data["users"].get(uid, {}).get("name", uid)
-        txt += f"{i}. {name} — {count} زرفه\n"
-    return txt
+def add_point(uid):
+    uid = sid(uid)
+    data["points"][uid] = data["points"].get(uid, 0) + 1
+    save_data(data)
 
 def xo_keyboard(chat_id):
     game = xo_games[chat_id]
@@ -353,25 +349,29 @@ def xo_winner(b):
     return "draw" if " " not in b else None
 
 def ask_quiz(chat_id, qtype):
+    if not data["settings"].get("games", True):
+        return bot.send_message(chat_id, "الألعاب معطلة.")
     if qtype == "math":
         a, b = random.randint(1, 20), random.randint(1, 20)
         op = random.choice(["+", "-", "*"])
         ans = str(eval(f"{a}{op}{b}"))
-        q = f"🧮 جاوب:\n{a} {op} {b} = ؟"
+        q = f"🧮 جاوب بالرد على هذه الرسالة:\n{a} {op} {b} = ؟"
     elif qtype == "meaning":
         q, ans = random.choice(MEANINGS)
-        q = "📚 " + q
+        q = "📚 جاوب بالرد:\n" + q
     elif qtype == "arabic":
         q, ans = random.choice(ARABIC_Q)
-        q = "📝 " + q
+        q = "📝 جاوب بالرد:\n" + q
     else:
         q, ans = random.choice(RIDDLES)
-        q = "🧩 " + q
-    quiz_games[chat_id] = ans.strip().lower()
-    bot.send_message(chat_id, q)
+        q = "🧩 جاوب بالرد:\n" + q
+    m = bot.send_message(chat_id, q)
+    quiz_games[m.message_id] = {"answer": ans.strip().lower(), "chat": chat_id}
 
 @bot.message_handler(commands=["start"])
 def start(message):
+    if message.chat.type != "private":
+        return
     register_user(message)
     if not check_sub(message): return
     if message.from_user.id == OWNER_ID:
@@ -448,7 +448,11 @@ def callbacks(call):
 def welcome(message):
     register_user(message)
     for u in message.new_chat_members:
-        bot.send_message(message.chat.id, f"هلا {u.first_name} 🌷\nنورت الكروب", reply_markup=start_buttons())
+        data["join_info"][sid(u.id)] = {"chat": message.chat.title or "", "by": "رابط أو إضافة", "time": int(time.time())}
+        save_data(data)
+        if not data["settings"].get("welcome", True):
+            continue
+        bot.send_message(message.chat.id, f"هلا {u.first_name} 🌷\nنورت الكروب")
 
 @bot.message_handler(content_types=["text", "photo", "video", "sticker", "animation", "document", "audio", "voice"])
 def handler(message):
@@ -459,33 +463,34 @@ def handler(message):
     locks = get_locks(message.chat.id)
     text = message.text or ""
 
-    if message.chat.type != "private":
-        if locks.get("all") and not is_admin(message.chat.id, message.from_user.id):
+    if message.chat.type != "private" and not is_admin(message.chat.id, message.from_user.id):
+        if locks.get("all"):
             try: bot.delete_message(message.chat.id, message.message_id)
             except: pass
             return
-        if locks.get("links") and text and ("http://" in text or "https://" in text or "t.me/" in text) and not is_admin(message.chat.id, message.from_user.id):
-            try: bot.delete_message(message.chat.id, message.message_id)
-            except: pass
-            return
-        if locks.get("photos") and message.content_type == "photo" and not is_admin(message.chat.id, message.from_user.id):
-            try: bot.delete_message(message.chat.id, message.message_id)
-            except: pass
-            return
-        if locks.get("videos") and message.content_type == "video" and not is_admin(message.chat.id, message.from_user.id):
-            try: bot.delete_message(message.chat.id, message.message_id)
-            except: pass
-            return
-        if locks.get("stickers") and message.content_type == "sticker" and not is_admin(message.chat.id, message.from_user.id):
+        checks = [
+            (locks.get("links") and text and ("http://" in text or "https://" in text or "t.me/" in text)),
+            (locks.get("photos") and message.content_type == "photo"),
+            (locks.get("videos") and message.content_type == "video"),
+            (locks.get("stickers") and message.content_type == "sticker"),
+            (locks.get("voice") and message.content_type == "voice"),
+            (locks.get("files") and message.content_type == "document"),
+            (locks.get("animation") and message.content_type == "animation"),
+            (locks.get("forward") and message.forward_date),
+        ]
+        if any(checks):
             try: bot.delete_message(message.chat.id, message.message_id)
             except: pass
             return
 
     if not text: return
 
-    if message.chat.id in quiz_games and text.strip().lower() == quiz_games[message.chat.id]:
-        quiz_games.pop(message.chat.id, None)
-        return bot.reply_to(message, f"✅ صح عليك {message.from_user.first_name}")
+    if message.reply_to_message and message.reply_to_message.message_id in quiz_games:
+        q = quiz_games[message.reply_to_message.message_id]
+        if text.strip().lower() == q["answer"]:
+            add_point(message.from_user.id)
+            quiz_games.pop(message.reply_to_message.message_id, None)
+            return bot.reply_to(message, f"✅ صح عليك {message.from_user.first_name}\nربحت نقطة 🎉")
 
     if message.from_user.id in waiting_reply:
         st = waiting_reply[message.from_user.id]
@@ -499,7 +504,7 @@ def handler(message):
             data["replies"].pop(text, None); save_data(data); del waiting_reply[message.from_user.id]
             return bot.reply_to(message, "✅ تم حذف الرد")
 
-    if text in data["replies"]:
+    if data["settings"].get("replies", True) and text in data["replies"]:
         return bot.reply_to(message, data["replies"][text])
 
     if text in ["الاوامر", "الأوامر", "اوامر"]:
@@ -509,6 +514,29 @@ def handler(message):
     if text == "سورس": return bot.reply_to(message, "أهلاً بك في سورس فادي 🔥")
     if text == "المطور": return bot.reply_to(message, f"👨‍💻 المطور: @{DEV_USERNAME}")
     if text == "شراء بوت مشابه": return bot.reply_to(message, f"للشراء راسل: @{DEV_USERNAME}")
+
+    if text == "ايدي":
+        rank = get_rank(message.chat.id, message.from_user.id) or "عضو"
+        username = f"@{message.from_user.username}" if message.from_user.username else "لايوجد"
+        txt = f"↶ USE = {username}\n↶ STA = {rank}\n↶ ID = <code>{message.from_user.id}</code>"
+        if data["settings"].get("id_photo", True):
+            try:
+                photos = bot.get_user_profile_photos(message.from_user.id, limit=1)
+                if photos.total_count > 0:
+                    return bot.send_photo(message.chat.id, photos.photos[0][-1].file_id, caption=txt, reply_to_message_id=message.message_id)
+            except:
+                pass
+        return bot.reply_to(message, txt)
+
+    if text == "تفعيل الايدي":
+        data["settings"]["id_photo"] = True; save_data(data)
+        return bot.reply_to(message, "✅ تم تفعيل الايدي بالصورة")
+    if text == "تعطيل الايدي":
+        data["settings"]["id_photo"] = False; save_data(data)
+        return bot.reply_to(message, "✅ تم تعطيل صورة الايدي")
+    if text == "منو ضافني":
+        info = data["join_info"].get(sid(message.from_user.id))
+        return bot.reply_to(message, f"تمت إضافتك إلى: {info.get('chat')}\nالطريقة: {info.get('by')}" if info else "ما عندي معلومات عن إضافتك.")
 
     if text in ["اضف رد", "اضافة رد"]:
         waiting_reply[message.from_user.id] = {"step": "add_word"}
@@ -522,6 +550,13 @@ def handler(message):
         if not can_admin(message): return
         data["replies"] = {}; save_data(data)
         return bot.reply_to(message, "✅ تم مسح الردود")
+
+    if text in ["تفعيل الترحيب", "تعطيل الترحيب", "تفعيل الردود", "تعطيل الردود", "تفعيل الالعاب", "تعطيل الالعاب"]:
+        if not can_admin(message): return
+        key = "welcome" if "الترحيب" in text else "replies" if "الردود" in text else "games"
+        data["settings"][key] = text.startswith("تفعيل")
+        save_data(data)
+        return bot.reply_to(message, "✅ تم التحديث")
 
     if text == "انشاء حساب بنكي":
         return bot.reply_to(message, "✅ تم إنشاء حسابك البنكي ورصيدك 1000$" if create_bank(message.from_user.id) else "عندك حساب بنكي مسبقاً")
@@ -563,9 +598,8 @@ def handler(message):
         return bot.reply_to(message, f"🦹 زرفت {amount}$")
     if text.startswith("تحويل "):
         acc = bank_user(message.from_user.id)
-        if not acc: return bot.reply_to(message, "ما عندك حساب")
         amount = parse_amount(text)
-        if not amount: return bot.reply_to(message, "اكتب: تحويل 100 بالرد")
+        if not acc or not amount: return bot.reply_to(message, "اكتب: تحويل 100 بالرد")
         if not message.reply_to_message: return bot.reply_to(message, "رد على الشخص")
         other = bank_user(message.reply_to_message.from_user.id)
         if not other: return bot.reply_to(message, "الشخص ما عنده حساب")
@@ -595,8 +629,12 @@ def handler(message):
         percent = random.randint(-90, 90); change = int(amount * percent / 100)
         acc["money"] += change; save_data(data)
         return bot.reply_to(message, f"📊 النسبة: {percent}%\nالنتيجة: {change}$")
-    if text == "توب الفلوس": return bot.reply_to(message, top_money())
-    if text == "توب الحراميه": return bot.reply_to(message, top_robbers())
+    if text == "توب الفلوس":
+        items = sorted(data["bank"].items(), key=lambda x: x[1].get("money", 0), reverse=True)[:10]
+        return bot.reply_to(message, "\n".join([f"{i+1}. {data['users'].get(uid,{}).get('name',uid)} — {info['money']}$" for i,(uid,info) in enumerate(items)]) or "ماكو")
+    if text == "توب الحراميه":
+        items = sorted(data["robbers"].items(), key=lambda x: x[1], reverse=True)[:10]
+        return bot.reply_to(message, "\n".join([f"{i+1}. {data['users'].get(uid,{}).get('name',uid)} — {c}" for i,(uid,c) in enumerate(items)]) or "ماكو")
 
     if text in ["امسح", "مسح بالرد"]:
         if not can_admin(message): return
@@ -631,7 +669,7 @@ def handler(message):
         except: bot.reply_to(message, "اكتب: مسح 10")
         return
 
-    if text in ["حظر", "طرد", "كتم", "الغاء الكتم", "الغاء الحظر"]:
+    if text in ["حظر", "طرد", "كتم", "الغاء الكتم", "الغاء الحظر", "الغاء التقييد"]:
         if not can_admin(message): return
         u = target_user(message)
         if not u: return
@@ -640,8 +678,46 @@ def handler(message):
             elif text == "الغاء الحظر": bot.unban_chat_member(message.chat.id, u.id); bot.reply_to(message, "تم إلغاء الحظر")
             elif text == "طرد": bot.ban_chat_member(message.chat.id, u.id); bot.unban_chat_member(message.chat.id, u.id); bot.reply_to(message, "تم الطرد")
             elif text == "كتم": bot.restrict_chat_member(message.chat.id, u.id, can_send_messages=False); bot.reply_to(message, "تم الكتم")
-            elif text == "الغاء الكتم": bot.restrict_chat_member(message.chat.id, u.id, can_send_messages=True, can_send_media_messages=True, can_send_other_messages=True, can_add_web_page_previews=True); bot.reply_to(message, "تم إلغاء الكتم")
+            else:
+                bot.restrict_chat_member(message.chat.id, u.id, can_send_messages=True, can_send_media_messages=True, can_send_other_messages=True, can_add_web_page_previews=True)
+                bot.reply_to(message, "تم رفع القيود")
         except: bot.reply_to(message, "تأكد البوت مشرف")
+        return
+
+    if text.startswith("تقييد "):
+        if not can_admin(message): return
+        u = target_user(message)
+        if not u: return
+        val = text.replace("تقييد ", "").strip()
+        secs = {"5":300, "10":600, "30":1800, "60":3600, "ساعة":3600, "يوم":86400, "اسبوع":604800}.get(val)
+        if not secs: return bot.reply_to(message, "اكتب: تقييد 5 أو 10 أو 30 أو ساعة أو يوم أو اسبوع بالرد")
+        try:
+            until = int(time.time()) + secs
+            bot.restrict_chat_member(message.chat.id, u.id, until_date=until, can_send_messages=False)
+            bot.reply_to(message, "✅ تم تقييده")
+        except: bot.reply_to(message, "تأكد البوت مشرف")
+        return
+
+    if text == "صلاحياته":
+        if not message.reply_to_message: return bot.reply_to(message, "رد على شخص")
+        try:
+            m = bot.get_chat_member(message.chat.id, message.reply_to_message.from_user.id)
+            st = "مشرف" if m.status == "administrator" else "مالك" if m.status == "creator" else "عضو"
+            def mark(x): return "ꪜ" if x else "✘"
+            txt = f"""⇜ {st}
+⇜ لقبه ( لايوجد )
+⇜ والصلاحيات هي ↓
+
+1 ⇠ صلاحيه تغيير المعلومات ( {mark(getattr(m, 'can_change_info', False))} )
+2 ⇠ صلاحيه حذف الرسائل ( {mark(getattr(m, 'can_delete_messages', False))} )
+3 ⇠ صلاحيه دعوه مستخدمين ( {mark(getattr(m, 'can_invite_users', False))} )
+4 ⇠ صلاحيه حظر وتقييد المستخدمين ( {mark(getattr(m, 'can_restrict_members', False))} )
+5 ⇠ صلاحيه تثبيت الرسائل ( {mark(getattr(m, 'can_pin_messages', False))} )
+6 ⇠ صلاحيه رفع مشرفين اخرين ( {mark(getattr(m, 'can_promote_members', False))} )
+7 ⇠ صلاحيه إدارة المكالمات ( {mark(getattr(m, 'can_manage_video_chats', False))} )
+8 ⇠ صلاحيه إدارة الستوريات ( {mark(getattr(m, 'can_manage_stories', False))} )"""
+            bot.reply_to(message, txt)
+        except: bot.reply_to(message, "ما قدرت أجيب صلاحياته")
         return
 
     if text.startswith("رفع "):
@@ -656,6 +732,9 @@ def handler(message):
     if text.startswith("تنزيل "):
         if not can_admin(message): return
         if text == "تنزيل الكل":
+            if message.reply_to_message:
+                del_rank(message.chat.id, message.reply_to_message.from_user.id)
+                return bot.reply_to(message, "تم تنزيل رتبته")
             data["ranks"][sid(message.chat.id)] = {}; save_data(data)
             return bot.reply_to(message, "تم تنزيل كل الرتب")
         u = target_user(message)
@@ -667,12 +746,13 @@ def handler(message):
         if not can_admin(message): return
         action = "قفل" if text.startswith("قفل ") else "فتح"
         name = text.replace(action + " ", "").strip()
-        mapping = {"الروابط":"links","الصور":"photos","الفيديو":"videos","الملصقات":"stickers","التوجيه":"forward","البوتات":"bots","الكل":"all"}
+        mapping = {"الروابط":"links","الصور":"photos","الفيديو":"videos","الفويسات":"voice","الملصقات":"stickers","الملفات":"files","المتحركات":"animation","التوجيه":"forward","البوتات":"bots","الكل":"all"}
         if name not in mapping: return bot.reply_to(message, "هذا الأمر غير موجود")
         locks[mapping[name]] = action == "قفل"; save_data(data)
         return bot.reply_to(message, f"{'🔒 تم قفل' if action=='قفل' else '🔓 تم فتح'} {name}")
 
     if text == "xo":
+        if not data["settings"].get("games", True): return bot.reply_to(message, "الألعاب معطلة")
         if not message.reply_to_message: return bot.reply_to(message, "رد على شخص")
         p1, p2 = message.from_user.id, message.reply_to_message.from_user.id
         if p1 == p2: return bot.reply_to(message, "ما تكدر تلعب ويا نفسك")
@@ -684,19 +764,24 @@ def handler(message):
     if text == "لغز": return ask_quiz(message.chat.id, "riddle")
     if text == "حجره": return bot.reply_to(message, f"أنا اخترت: {random.choice(['حجرة','ورقة','مقص'])}")
     if text == "كت تويت": return bot.reply_to(message, random.choice(CUT_TWEET))
+    if text == "افلام": return bot.reply_to(message, "🎬 " + random.choice(MOVIES))
     if text in ["ارقام", "تخمين"]:
-        n = random.randint(1, 10); quiz_games[message.chat.id] = str(n)
-        return bot.reply_to(message, "خمن رقم من 1 إلى 10")
+        n = random.randint(1, 10)
+        m = bot.reply_to(message, "خمن رقم من 1 إلى 10 بالرد")
+        quiz_games[m.message_id] = {"answer": str(n), "chat": message.chat.id}
+        return
     if text == "ايموجي":
-        em = random.choice(["😂", "❤️", "🔥", "😎", "😭"]); quiz_games[message.chat.id] = em
-        return bot.reply_to(message, f"اكتب هذا الإيموجي: {em}")
-    if text == "روليت":
-        names = ["الأحمر", "الأسود"]
-        return bot.reply_to(message, f"🎰 النتيجة: {random.choice(names)}")
+        em = random.choice(["😂", "❤️", "🔥", "😎", "😭"])
+        m = bot.reply_to(message, f"اكتب هذا الإيموجي بالرد: {em}")
+        quiz_games[m.message_id] = {"answer": em, "chat": message.chat.id}
+        return
+    if text == "روليت": return bot.reply_to(message, f"🎰 النتيجة: {random.choice(['الأحمر', 'الأسود'])}")
 
-    if text in ["زواج", "طلاق"]:
-        if not message.reply_to_message: return bot.reply_to(message, "رد على شخص")
-        return bot.reply_to(message, "💍 تم الزواج" if text == "زواج" else "💔 تم الطلاق")
+    if text in ["ز", "زوجني"]:
+        names = ["سارة", "نور", "ملاك", "زينب", "حوراء", "فاطمة", "رقيه", "شهد"]
+        return bot.reply_to(message, f"💍 تم زواجك من @{random.choice(names)}")
+    if text == "طلاق":
+        return bot.reply_to(message, "💔 تم الطلاق بنجاح")
 
     if text.startswith("يوت "):
         query = text.replace("يوت ", "").strip()
