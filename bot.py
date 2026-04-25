@@ -670,7 +670,7 @@ def handler(message):
     query = text.replace("يوت ", "").strip()
 
     if not query:
-        return bot.reply_to(message, "اكتب اسم الأغنية بعد يوت")
+        return bot.reply_to(message, "❌ اكتب اسم الاغنية بعد يوت")
 
     wait = bot.reply_to(message, "🔎 جاري البحث...")
 
@@ -679,45 +679,41 @@ def handler(message):
 
         search_url = "https://www.youtube.com/results"
         search_params = {"search_query": query}
-        search_res = requests.get(search_url, params=search_params, timeout=20)
+        search_res = requests.get(search_url, params=search_params)
 
-        video_ids = re.findall(r"watch\?v=(\S{11})", search_res.text)
+        video_ids = re.findall(r"watch\\?v=(\\S{11})", search_res.text)
 
         if not video_ids:
             return bot.reply_to(message, "❌ ما حصلت نتيجة")
 
-        youtube_url = f"https://www.youtube.com/watch?v={video_ids[0]}"
+        video_url = f"https://www.youtube.com/watch?v={video_ids[0]}"
 
         api_url = "https://yt-search-and-download-mp3.p.rapidapi.com/mp3"
-
         headers = {
             "X-RapidAPI-Key": RAPID_API_KEY,
             "X-RapidAPI-Host": "yt-search-and-download-mp3.p.rapidapi.com"
         }
+        params = {"url": video_url}
 
-        params = {"url": youtube_url}
+        res = requests.get(api_url, headers=headers, params=params).json()
 
-        res = requests.get(api_url, headers=headers, params=params, timeout=60)
-        data = res.json()
+        if not res.get("success"):
+            return bot.reply_to(message, "❌ فشل جلب الصوت")
 
-        audio_url = data.get("link")
-
-        if not audio_url:
-            return bot.reply_to(message, "❌ ما حصلت صوت")
+        audio_url = res.get("link")
+        title = res.get("title", "Unknown")
 
         bot.delete_message(message.chat.id, wait.message_id)
 
         bot.send_audio(
             message.chat.id,
             audio_url,
-            title=query,
-            performer="Aurelius",
+            caption=f"🎧 {title}",
             reply_to_message_id=message.message_id
         )
 
     except Exception as e:
-        print(e)
-        bot.reply_to(message, "❌ خطأ")
+        bot.reply_to(message, f"❌ خطأ: {e}")
 
 
 print("Aurelius bot is running...")
