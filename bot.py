@@ -674,6 +674,18 @@ def handler(message):
         wait = bot.reply_to(message, "🔎 جاري البحث عن الأغنية...")
 
         try:
+            search_url = "https://www.youtube.com/results"
+            search_params = {"search_query": query}
+            search_res = requests.get(search_url, params=search_params, timeout=20)
+
+            import re
+            video_ids = re.findall(r"watch\?v=(\S{11})", search_res.text)
+
+            if not video_ids:
+                return bot.reply_to(message, "❌ ما حصلت نتيجة باليوتيوب")
+
+            youtube_url = f"https://www.youtube.com/watch?v={video_ids[0]}"
+
             url = "https://yt-search-and-download-mp3.p.rapidapi.com/mp3"
 
             headers = {
@@ -681,7 +693,7 @@ def handler(message):
                 "X-RapidAPI-Host": "yt-search-and-download-mp3.p.rapidapi.com"
             }
 
-            params = {"q": query}
+            params = {"url": youtube_url}
 
             res = requests.get(url, headers=headers, params=params, timeout=60)
             api_data = res.json()
@@ -693,6 +705,7 @@ def handler(message):
                 or api_data.get("url")
                 or api_data.get("audio")
                 or api_data.get("download")
+                or api_data.get("mp3")
             )
 
             title = api_data.get("title") or query
