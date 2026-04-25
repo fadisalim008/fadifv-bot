@@ -667,74 +667,70 @@ def handler(message):
             bot.reply_to(message, "💔 تم الطلاق بنجاح")
 
     elif text.startswith("يوت "):
-        query = text.replace("يوت ", "").strip()
-        if not query:
-            return bot.reply_to(message, "اكتب اسم الأغنية بعد يوت")
+    query = text.replace("يوت ", "").strip()
+    if not query:
+        return bot.reply_to(message, "اكتب اسم الأغنية بعد يوت")
 
-        wait = bot.reply_to(message, "🔎 جاري البحث عن الأغنية...")
+    wait = bot.reply_to(message, "🔎 جاري البحث عن الأغنية...")
+
+    try:
+        import re
+
+        # 🔎 البحث في يوتيوب
+        search_url = "https://www.youtube.com/results"
+        search_params = {"search_query": query}
+        search_res = requests.get(search_url, params=search_params, timeout=20)
+
+        video_ids = re.findall(r"watch\?v=(\S{11})", search_res.text)
+
+        if not video_ids:
+            return bot.reply_to(message, "❌ ما حصلت نتيجة")
+
+        youtube_url = f"https://www.youtube.com/watch?v={video_ids[0]}"
+
+        # 🎧 API
+        api_url = "https://yt-search-and-download-mp3.p.rapidapi.com/mp3"
+
+        headers = {
+            "X-RapidAPI-Key": RAPID_API_KEY,
+            "X-RapidAPI-Host": "yt-search-and-download-mp3.p.rapidapi.com"
+        }
+
+        params = {"url": youtube_url}
+
+        res = requests.get(api_url, headers=headers, params=params, timeout=60)
+        data = res.json()
+
+        print("API RESPONSE:", data)
+
+        audio_url = (
+            data.get("link")
+            or data.get("url")
+            or data.get("audio")
+            or data.get("download")
+            or data.get("mp3")
+        )
+
+        if not audio_url:
+            return bot.reply_to(message, "❌ ما حصلت رابط الصوت")
 
         try:
-            import re
+            bot.delete_message(message.chat.id, wait.message_id)
+        except:
+            pass
 
-            search_url = "https://www.youtube.com/results"
-            search_params = {"search_query": query}
-            search_res = requests.get(search_url, params=search_params, timeout=20)
+        # 🎵 إرسال باسم الأغنية الحقيقي (من المستخدم)
+        bot.send_audio(
+            message.chat.id,
+            audio_url,
+            title=query,
+            performer="Aurelius",
+            reply_to_message_id=message.message_id
+        )
 
-            video_ids = re.findall(r"watch\?v=(\S{11})", search_res.text)
-
-            if not video_ids:
-                return bot.reply_to(message, "❌ ما حصلت نتيجة باليوتيوب")
-
-            youtube_url = f"https://www.youtube.com/watch?v={video_ids[0]}"
-
-            api_url = "https://yt-search-and-download-mp3.p.rapidapi.com/mp3"
-
-            headers = {
-                "X-RapidAPI-Key": RAPID_API_KEY,
-                "X-RapidAPI-Host": "yt-search-and-download-mp3.p.rapidapi.com"
-            }
-
-            params = {"url": youtube_url}
-
-            res = requests.get(api_url, headers=headers, params=params, timeout=60)
-            api_data = res.json()
-
-            print("API RESPONSE:", api_data)
-
-            audio_url = (
-                api_data.get("link")
-                or api_data.get("url")
-                or api_data.get("audio")
-                or api_data.get("download")
-                or api_data.get("mp3")
-            )
-
-            title = (
-                api_data.get("title")
-                or api_data.get("name")
-                or api_data.get("videoTitle")
-                or query
-            )
-
-            if not audio_url:
-                return bot.reply_to(message, "❌ ما حصلت رابط الصوت من الـ API")
-
-            try:
-                bot.delete_message(message.chat.id, wait.message_id)
-            except:
-                pass
-
-            bot.send_audio(
-                message.chat.id,
-                audio_url,
-                title=title,
-                performer="Aurelius",
-                reply_to_message_id=message.message_id
-            )
-
-        except Exception as e:
-            print("API MUSIC ERROR:", e)
-            bot.reply_to(message, "❌ صار خطأ أثناء جلب الأغنية من API")
+    except Exception as e:
+        print("ERROR:", e)
+        bot.reply_to(message, "❌ خطأ أثناء جلب الأغنية")
 
 
 print("Aurelius bot is running...")
