@@ -668,15 +668,15 @@ def handler(message):
 
     elif text.startswith("يوت "):
     query = text.replace("يوت ", "").strip()
+
     if not query:
         return bot.reply_to(message, "اكتب اسم الأغنية بعد يوت")
 
-    wait = bot.reply_to(message, "🔎 جاري البحث عن الأغنية...")
+    wait = bot.reply_to(message, "🔎 جاري البحث...")
 
     try:
         import re
 
-        # 🔎 البحث في يوتيوب
         search_url = "https://www.youtube.com/results"
         search_params = {"search_query": query}
         search_res = requests.get(search_url, params=search_params, timeout=20)
@@ -688,7 +688,6 @@ def handler(message):
 
         youtube_url = f"https://www.youtube.com/watch?v={video_ids[0]}"
 
-        # 🎧 API
         api_url = "https://yt-search-and-download-mp3.p.rapidapi.com/mp3"
 
         headers = {
@@ -701,25 +700,13 @@ def handler(message):
         res = requests.get(api_url, headers=headers, params=params, timeout=60)
         data = res.json()
 
-        print("API RESPONSE:", data)
-
-        audio_url = (
-            data.get("link")
-            or data.get("url")
-            or data.get("audio")
-            or data.get("download")
-            or data.get("mp3")
-        )
+        audio_url = data.get("link")
 
         if not audio_url:
-            return bot.reply_to(message, "❌ ما حصلت رابط الصوت")
+            return bot.reply_to(message, "❌ ما حصلت صوت")
 
-        try:
-            bot.delete_message(message.chat.id, wait.message_id)
-        except:
-            pass
+        bot.delete_message(message.chat.id, wait.message_id)
 
-        # 🎵 إرسال باسم الأغنية الحقيقي (من المستخدم)
         bot.send_audio(
             message.chat.id,
             audio_url,
@@ -729,8 +716,8 @@ def handler(message):
         )
 
     except Exception as e:
-        print("ERROR:", e)
-        bot.reply_to(message, "❌ خطأ أثناء جلب الأغنية")
+        print(e)
+        bot.reply_to(message, "❌ خطأ")
 
 
 print("Aurelius bot is running...")
