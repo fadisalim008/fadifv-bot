@@ -25,7 +25,6 @@ DEFAULT_DATA = {
     "notify": True
 }
 
-
 def load_data():
     if not os.path.exists(DATA_FILE):
         save_data(DEFAULT_DATA)
@@ -41,23 +40,18 @@ def load_data():
         save_data(DEFAULT_DATA)
         return DEFAULT_DATA.copy()
 
-
 def save_data(data):
     with open(DATA_FILE, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
 
-
 data = load_data()
 waiting_reply = {}
-
 
 def chat_id_str(chat_id):
     return str(chat_id)
 
-
 def user_id_str(user_id):
     return str(user_id)
-
 
 def register_user(message):
     if not message.from_user:
@@ -68,17 +62,18 @@ def register_user(message):
     if uid not in data["users"]:
         data["users"][uid] = {
             "name": message.from_user.first_name or "",
-            "username": message.from_user.username or ""
+            "username": message.from_user.username or "ماكو"
         }
         save_data(data)
 
         if data.get("notify", True):
             try:
+                username = message.from_user.username or "ماكو"
                 bot.send_message(
                     OWNER_ID,
                     f"🔔 دخول مستخدم جديد للبوت\n\n"
                     f"👤 الاسم: {message.from_user.first_name}\n"
-                    f"🔗 اليوزر: @{message.from_user.username}\n"
+                    f"🔗 اليوزر: {username}\n"
                     f"🆔 الايدي: {message.from_user.id}"
                 )
             except:
@@ -92,7 +87,6 @@ def register_user(message):
                 "username": message.chat.username or ""
             }
             save_data(data)
-
 
 def get_locks(chat_id):
     cid = chat_id_str(chat_id)
@@ -109,12 +103,10 @@ def get_locks(chat_id):
         save_data(data)
     return data["locks"][cid]
 
-
 def get_rank(chat_id, user_id):
     cid = chat_id_str(chat_id)
     uid = user_id_str(user_id)
     return data["ranks"].get(cid, {}).get(uid)
-
 
 def set_rank(chat_id, user_id, rank):
     cid = chat_id_str(chat_id)
@@ -123,7 +115,6 @@ def set_rank(chat_id, user_id, rank):
     data["ranks"][cid][uid] = rank
     save_data(data)
 
-
 def del_rank(chat_id, user_id):
     cid = chat_id_str(chat_id)
     uid = user_id_str(user_id)
@@ -131,21 +122,18 @@ def del_rank(chat_id, user_id):
         del data["ranks"][cid][uid]
         save_data(data)
 
-
 def is_subscribed(user_id):
     try:
         member = bot.get_chat_member(FORCE_CHANNEL, user_id)
         return member.status in ["member", "administrator", "creator"]
     except Exception as e:
-        print("SUB CHECK ERROR:", e)
-        return False
-
+        print("SUB ERROR:", e)
+        return True
 
 def sub_keyboard():
     kb = InlineKeyboardMarkup()
     kb.add(InlineKeyboardButton("اشترك بالقناة", url="https://t.me/fadifva"))
     return kb
-
 
 def check_sub(message):
     if message.from_user and not is_subscribed(message.from_user.id):
@@ -157,7 +145,6 @@ def check_sub(message):
         return False
     return True
 
-
 def is_admin(chat_id, user_id):
     try:
         member = bot.get_chat_member(chat_id, user_id)
@@ -168,7 +155,6 @@ def is_admin(chat_id, user_id):
     except:
         return False
 
-
 def can_use_admin(message):
     if message.chat.type == "private":
         return False
@@ -177,13 +163,11 @@ def can_use_admin(message):
         return False
     return True
 
-
 def target_user(message):
     if not message.reply_to_message:
         bot.reply_to(message, "❗ لازم ترد على رسالة الشخص")
         return None
     return message.reply_to_message.from_user
-
 
 def main_menu():
     kb = InlineKeyboardMarkup()
@@ -194,20 +178,20 @@ def main_menu():
     kb.add(InlineKeyboardButton("5️⃣ أوامر Dev", callback_data="help_dev"))
     return kb
 
-
 def owner_panel():
     kb = InlineKeyboardMarkup(row_width=2)
+    kb.add(InlineKeyboardButton("🟢➕ صانع الردود", callback_data="owner_add_reply"))
     kb.add(
-        InlineKeyboardButton("➕ أضف رد", callback_data="owner_add_reply"),
-        InlineKeyboardButton("📜 الردود", callback_data="owner_replies"),
-        InlineKeyboardButton("🗑 حذف رد", callback_data="owner_del_reply"),
-        InlineKeyboardButton("👥 المستخدمين", callback_data="owner_users"),
-        InlineKeyboardButton("📊 الكروبات", callback_data="owner_groups"),
-        InlineKeyboardButton("🔔 إشعار الدخول", callback_data="owner_notify"),
-        InlineKeyboardButton("📚 أوامر البوت", callback_data="commands")
+        InlineKeyboardButton("🔵📜 الردود", callback_data="owner_replies"),
+        InlineKeyboardButton("🔵👥 المستخدمين", callback_data="owner_users")
     )
+    kb.add(
+        InlineKeyboardButton("🔴🗑 حذف رد", callback_data="owner_del_reply"),
+        InlineKeyboardButton("🔵📊 الكروبات", callback_data="owner_groups")
+    )
+    kb.add(InlineKeyboardButton("🟡🔔 إشعار الدخول", callback_data="owner_notify"))
+    kb.add(InlineKeyboardButton("🔴 رجوع", callback_data="commands"))
     return kb
-
 
 def start_buttons():
     kb = InlineKeyboardMarkup()
@@ -216,7 +200,6 @@ def start_buttons():
     kb.add(InlineKeyboardButton("💰 شراء بوت مشابه", url=f"https://t.me/{DEV_USERNAME}"))
     kb.add(InlineKeyboardButton("📚 الأوامر", callback_data="commands"))
     return kb
-
 
 HELP_ADMIN = """
 <b>أوامر الإدارة</b>
@@ -310,7 +293,6 @@ HELP_DEV = f"""
 القناة: {FORCE_CHANNEL}
 """
 
-
 @bot.message_handler(commands=["start"])
 def start(message):
     register_user(message)
@@ -330,7 +312,6 @@ def start(message):
             "أهلاً بك في بوت فادي المطور 🌷\nاختر من الأزرار بالأسفل 👇",
             reply_markup=start_buttons()
         )
-
 
 @bot.callback_query_handler(func=lambda call: True)
 def callbacks(call):
@@ -386,9 +367,9 @@ def callbacks(call):
         elif call.data == "owner_users":
             txt = f"👥 عدد المستخدمين: {len(data['users'])}\n\n"
             for uid, info in list(data["users"].items())[-20:]:
-                username = info.get("username") or "بدون"
+                username = info.get("username") or "ماكو"
                 name = info.get("name") or "بدون"
-                txt += f"• {name} | @{username} | <code>{uid}</code>\n"
+                txt += f"• {name} | {username} | <code>{uid}</code>\n"
             bot.send_message(call.message.chat.id, txt)
 
         elif call.data == "owner_groups":
@@ -405,7 +386,6 @@ def callbacks(call):
             save_data(data)
             status = "مفعل ✅" if data["notify"] else "متوقف ❌"
             bot.send_message(call.message.chat.id, f"🔔 إشعار الدخول: {status}")
-
 
 @bot.message_handler(content_types=["new_chat_members"])
 def welcome(message):
@@ -426,7 +406,6 @@ def welcome(message):
             f"هلا {u.first_name} 🌷\nنورت الكروب\nالتزم بالقوانين وتقدر تشارك برأيك بكل احترام.",
             reply_markup=start_buttons()
         )
-
 
 @bot.message_handler(content_types=["text", "photo", "video", "sticker", "document", "audio", "voice"])
 def handler(message):
@@ -691,33 +670,32 @@ def handler(message):
         if not query:
             return bot.reply_to(message, "اكتب اسم الأغنية بعد يوت")
 
-        wait = bot.reply_to(message, "🔎 جاري البحث...")
+        wait = bot.reply_to(message, "🔎 جاري البحث عن الأغنية...")
 
         try:
+            safe_id = f"{message.chat.id}_{message.message_id}"
+            filename_template = f"music_{safe_id}.%(ext)s"
+
             ydl_opts = {
                 "format": "bestaudio/best",
+                "outtmpl": filename_template,
                 "quiet": True,
                 "noplaylist": True,
                 "default_search": "ytsearch1",
+                "cookiefile": "cookies.txt",
                 "geo_bypass": True,
                 "nocheckcertificate": True,
-                "extractor_args": {
-                    "youtube": {
-                        "player_client": ["android", "ios", "web"]
-                    }
-                },
-                "http_headers": {
-                    "User-Agent": "com.google.android.youtube/17.31.35 (Linux; U; Android 11)"
-                }
+                "retries": 10,
+                "fragment_retries": 10
             }
 
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                info = ydl.extract_info(query, download=False)
+                info = ydl.extract_info(query, download=True)
 
                 if "entries" in info:
                     info = info["entries"][0]
 
-                audio_url = info["url"]
+                filename = ydl.prepare_filename(info)
                 title = info.get("title", query)
                 duration = info.get("duration", 0)
 
@@ -726,22 +704,26 @@ def handler(message):
             except:
                 pass
 
-            bot.send_audio(
-                message.chat.id,
-                audio_url,
-                title=title,
-                performer="Aurelius",
-                duration=duration
-            )
+            with open(filename, "rb") as audio:
+                bot.send_audio(
+                    message.chat.id,
+                    audio,
+                    title=title,
+                    performer="Aurelius",
+                    duration=duration
+                )
+
+            try:
+                os.remove(filename)
+            except:
+                pass
 
         except Exception as e:
             print("MUSIC ERROR:", e)
             bot.reply_to(
                 message,
-                "❌ يوتيوب حاظر السيرفر حالياً.\n"
-                "جرّب اسم ثاني أو نحتاج VPS/API حتى يشتغل بثبات."
+                "❌ صار خطأ أثناء جلب الأغنية.\nتأكد ملف cookies.txt مرفوع بنفس مكان bot.py"
             )
-
 
 print("Aurelius bot is running...")
 bot.infinity_polling(skip_pending=True)
