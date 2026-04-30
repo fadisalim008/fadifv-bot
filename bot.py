@@ -3,7 +3,7 @@ import telebot, requests
 from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
 
 TOKEN = "8516176029:AAH-s3Y0nLAdmQN_LyeR3aS-tbK1XInMINY"
-RAPID_API_KEY = "7c9ef53d4dmsh8490d4a7e6aa829p1d4e17jsn2ffd61fefcb8"
+RAPID_API_KEY = "f590d18da9mshd55fe58cee3c77cp141b8ajsn63f68639be0f"
 
 OWNER_ID = 8065884629
 BOT_USERNAME = "fadifvambot"
