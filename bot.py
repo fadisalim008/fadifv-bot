@@ -6,7 +6,7 @@ from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
 # حط التوكنات من Railway Variables أفضل:
 # BOT_TOKEN = توكن البوت
 # RAPID_API_KEY = مفتاح RapidAPI
-TOKEN = os.getenv("BOT_TOKEN", "8516176029:AAF7KufWPntnbb76VH3tOEpuZuVwKoxJM9E")
+TOKEN = os.getenv("BOT_TOKEN", "8516176029:AAFEAuEU93dkwAdjKva8M6M_SQjHjHxn4Uo")
 RAPID_API_KEY = os.getenv("RAPID_API_KEY", "f590d18da9mshd55fe58cee3c77cp141b8ajsn63f68639be0f")
 
 OWNER_ID = int(os.getenv("OWNER_ID", "8065884629"))
