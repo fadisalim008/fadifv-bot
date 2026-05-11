@@ -8,7 +8,7 @@ from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
 # BOT_TOKEN = توكن البوت
 # RAPID_API_KEY = مفتاح RapidAPI
 TOKEN = os.getenv("BOT_TOKEN", "8516176029:AAFEAuEU93dkwAdjKva8M6M_SQjHjHxn4Uo")
-RAPID_API_KEY = os.getenv("RAPID_API_KEY", "f590d18da9mshd55fe58cee3c77cp141b8ajsn63f68639be0f")
+RAPID_API_KEY = os.getenv("RAPID_API_KEY", "78420a7cadmsh4c0b551fb859336p128e4ajsne5d9fd86d545")
 
 OWNER_ID = int(os.getenv("OWNER_ID", "8065884629"))
 BOT_USERNAME = os.getenv("BOT_USERNAME", "fadifvambot")
