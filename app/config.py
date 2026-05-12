@@ -12,6 +12,8 @@ FORCE_CHANNEL = os.getenv("FORCE_CHANNEL", "fadifva")
 
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY", "")
 
+RAPID_API_KEY = os.getenv("RAPID_API_KEY", "")
+
 START_PHOTO = os.getenv(
     "START_PHOTO",
     "https://i.ibb.co/xqVzNV7t/db72f6d6-2b6a-4f58-abdc-2f47a3aeb664.jpg"
