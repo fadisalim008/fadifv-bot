@@ -110,8 +110,3 @@ def fast_check(message: Message):
 def game_answer(call):
 
     handle_game_answer(bot, call)
-
-
-print("BOT STARTED")
-
-bot.infinity_polling()
