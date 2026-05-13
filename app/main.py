@@ -20,11 +20,11 @@ bot = TeleBot(BOT_TOKEN, parse_mode="HTML")
 
 @bot.message_handler(commands=["start"])
 def start(message: Message):
-
-    bot.send_message(
+    raw_send_photo(
         message.chat.id,
+        START_PHOTO,
         "هلا بك في بوت فادي",
-        reply_markup=start_buttons()
+        start_buttons()
     )
 
 
