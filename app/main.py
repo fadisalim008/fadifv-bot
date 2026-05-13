@@ -1,3 +1,5 @@
+from app.buttons import start_buttons, raw_send_photo
+from app.config import BOT_TOKEN, START_PHOTO
 from telebot import TeleBot
 from telebot.types import Message
 
