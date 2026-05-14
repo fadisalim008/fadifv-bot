@@ -1,4 +1,5 @@
-from telebot import TeleBot from telebot.types import Message
+from telebot import TeleBot
+from telebot.types import Message
 
 from app.config import BOT_TOKEN, START_PHOTO from app.buttons import start_buttons, raw_send_photo from app.help import help_menu, get_help_text from app.music import send_music from app.weather import get_weather from app.ai import ask_ai from app.whisper import create_whisper, handle_whisper from app.id import get_id_text
 
