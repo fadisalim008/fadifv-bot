@@ -1,226 +1,216 @@
 from telebot import TeleBot
 from telebot.types import Message
 
-from app.config import BOT_TOKEN, START_PHOTO from app.buttons import start_buttons, raw_send_photo from app.help import help_menu, get_help_text from app.music import send_music from app.weather import get_weather from app.ai import ask_ai from app.whisper import create_whisper, handle_whisper from app.id import get_id_text
-
-from app.games import ( GAME_NAMES, make_game, handle_game_answer, start_fast, check_fast, random_cut, random_would )
-
-from app.entertainment import ( random_theme, random_poem, random_anime, random_movie, random_series, marry_user, call_user )
-
-from app.moderation import ( mute, unmute, ban, unban, kick, restrict, lift_restrictions, warn, warnings_count, clear_warnings, clear_muted, clear_restricted, clear_banned )
+from app.config import BOT_TOKEN
 
 bot = TeleBot(BOT_TOKEN, parse_mode="HTML")
 
-members_cache = {}
 
-def add_member(chat_id, user_id): cid = str(chat_id)
+@bot.message_handler(commands=["start"])
+def start(message):
 
-if cid not in members_cache:
-    members_cache[cid] = set()
-
-members_cache[cid].add(user_id)
-
-def get_members(chat_id): return list(members_cache.get(str(chat_id), []))
-
-@bot.message_handler(commands=["start"]) def start(message: Message):
-
-add_member(message.chat.id, message.from_user.id)
-
-raw_send_photo(
-    message.chat.id,
-    START_PHOTO,
-    "هلا بك في بوت فادي",
-    start_buttons()
-)
-
-@bot.callback_query_handler(func=lambda call: True) def callbacks(call):
-
-if call.data.startswith("game:"):
-    return handle_game_answer(bot, call)
-
-if call.data.startswith("whisper_"):
-    return handle_whisper(bot, call)
-
-if call.data == "help" or call.data.startswith("help") or call.data == "bank":
-
-    return bot.edit_message_caption(
-        chat_id=call.message.chat.id,
-        message_id=call.message.message_id,
-        caption=get_help_text(call.data),
-        reply_markup=help_menu()
-    )
-
-@bot.message_handler(func=lambda m: True) def handler(message: Message):
-
-add_member(message.chat.id, message.from_user.id)
-
-if not message.text:
-    return
-
-text = message.text.strip()
-
-if text in ["الاوامر", "الأوامر", "اوامر"]:
-
-    return raw_send_photo(
-        message.chat.id,
-        START_PHOTO,
-        "قائمة الاوامر",
-        help_menu()
-    )
-
-if text in ["ايدي", "ا"]:
-
-    return bot.reply_to(
+    bot.reply_to(
         message,
-        get_id_text(message.from_user),
-        parse_mode="HTML"
+        "هلا بك في بوت فادي"
     )
 
-if text.startswith("يوت "):
 
-    return send_music(
-        bot,
-        message,
-        text.replace("يوت ", "", 1)
-    )
+@bot.message_handler(func=lambda m: True)
+def all_messages(message):
 
-if text.startswith("طقس "):
+    text = message.text if message.text else ""
 
-    return bot.reply_to(
-        message,
-        get_weather(
-            text.replace("طقس ", "", 1)
+    # ايدي
+    if text in ["ايدي", "ا"]:
+
+        msg = f"""
+<blockquote>
+
+👑 <b>OWNER INFO</b>
+
+🔥 Name ⇴ {message.from_user.first_name}
+
+💎 User ⇴ @{message.from_user.username}
+
+✨ ID ⇴ {message.from_user.id}
+
+</blockquote>
+"""
+
+        return bot.reply_to(
+            message,
+            msg,
+            parse_mode="HTML"
         )
-    )
 
-if text.startswith("زنجي "):
+    # الاوامر
+    if text in ["الاوامر", "اوامر"]:
 
-    return bot.reply_to(
-        message,
-        ask_ai(
-            text.replace("زنجي ", "", 1)
+        return bot.reply_to(
+            message,
+            """
+1 - القفل والفتح
+2 - الادمنية
+3 - المسح
+4 - الحظر والطرد
+5 - الترفيه
+6 - الالعاب
+"""
         )
-    )
 
-if (
-    text.startswith("همسة ")
-    or text.startswith("همسه ")
-    or text.startswith("هم ")
-):
+    # همسة
+    if text.startswith("همسة") or text.startswith("همسه"):
 
-    return create_whisper(bot, message)
+        return bot.reply_to(
+            message,
+            "تم ارسال الهمسة"
+        )
 
-if text in GAME_NAMES:
+    # ثيم
+    if text == "ثيم":
 
-    q, kb = make_game(text)
+        return bot.reply_to(
+            message,
+            "https://t.me/addtheme/ClassicBlue"
+        )
 
-    return bot.send_message(
-        message.chat.id,
-        q,
-        reply_markup=kb
-    )
+    # شعر
+    if text == "شعر":
 
-if text == "الاسرع":
+        return bot.reply_to(
+            message,
+            "https://www.youtube.com/results?search_query=قصيدة"
+        )
 
-    word = start_fast(message.chat.id)
+    # انمي
+    if text == "انمي":
 
-    return bot.send_message(
-        message.chat.id,
-        f"اول واحد يكتب:\n{word}"
-    )
+        return bot.reply_to(
+            message,
+            "Attack on Titan\nصراع البشر ضد العمالقة"
+        )
 
-if check_fast(message.chat.id, text):
-    return bot.reply_to(message, "فزت")
+    # فلم
+    if text == "فلم":
 
-if text in ["كت", "كت تويت", "صراحة"]:
-    return bot.reply_to(message, random_cut())
+        return bot.reply_to(
+            message,
+            "Interstellar\nرحلة فضائية لانقاذ البشرية"
+        )
 
-if text == "لو خيروك":
-    return bot.reply_to(message, random_would())
+    # مسلسل
+    if text == "مسلسل":
 
-if text == "ثيم":
-    return bot.reply_to(message, random_theme())
+        return bot.reply_to(
+            message,
+            "Breaking Bad\nمدرس يدخل عالم المخدرات"
+        )
 
-if text == "شعر":
-    return bot.reply_to(message, random_poem())
+    # زوجني
+    if text in ["زوجني", "ز"]:
 
-if text == "انمي":
-    return bot.reply_to(message, random_anime())
+        return bot.reply_to(
+            message,
+            "تم زواجك عشوائياً 😂"
+        )
 
-if text in ["فلم", "افلام"]:
-    return bot.reply_to(message, random_movie())
+    # نداء
+    if text in ["نداء", "نن"]:
 
-if text == "مسلسل":
-    return bot.reply_to(message, random_series())
+        return bot.reply_to(
+            message,
+            "تم نداء عضو عشوائي"
+        )
 
-if text in ["زوجني", "ز"]:
+    # كتم
+    if text == "كتم":
 
-    partner = marry_user(
-        message.chat.id,
-        message.from_user.id,
-        get_members(message.chat.id)
-    )
+        if not message.reply_to_message:
+            return bot.reply_to(message, "رد على الشخص")
 
-    if not partner:
-        return bot.reply_to(message, "ماكو اعضاء كفاية")
+        try:
 
-    return bot.reply_to(
-        message,
-        f"تم زواجك من:\n{partner}"
-    )
+            bot.restrict_chat_member(
+                message.chat.id,
+                message.reply_to_message.from_user.id,
+                can_send_messages=False
+            )
 
-if text in ["نداء", "نن"]:
+            bot.reply_to(message, "تم كتم العضو")
 
-    user = call_user(
-        message.chat.id,
-        get_members(message.chat.id)
-    )
+        except:
 
-    if not user:
-        return bot.reply_to(message, "ماكو اعضاء")
+            bot.reply_to(message, "ماكدرت اكتمه")
 
-    return bot.reply_to(
-        message,
-        f"نداء للعضو:\n{user}"
-    )
+    # الغاء الكتم
+    if text == "الغاء الكتم":
 
-if text == "كتم":
-    return mute(bot, message)
+        if not message.reply_to_message:
+            return bot.reply_to(message, "رد على الشخص")
 
-if text == "الغاء الكتم":
-    return unmute(bot, message)
+        try:
 
-if text == "حظر":
-    return ban(bot, message)
+            bot.restrict_chat_member(
+                message.chat.id,
+                message.reply_to_message.from_user.id,
+                can_send_messages=True,
+                can_send_media_messages=True,
+                can_send_other_messages=True,
+                can_add_web_page_previews=True
+            )
 
-if text == "الغاء حظر":
-    return unban(bot, message)
+            bot.reply_to(message, "تم الغاء الكتم")
 
-if text == "طرد":
-    return kick(bot, message)
+        except:
 
-if text == "تقييد":
-    return restrict(bot, message)
+            bot.reply_to(message, "ماكدرت الغي الكتم")
 
-if text in ["رفع القيود", "رف"]:
-    return lift_restrictions(bot, message)
+    # حظر
+    if text == "حظر":
 
-if text == "مسح المكتومين":
-    return clear_muted(bot, message)
+        if not message.reply_to_message:
+            return bot.reply_to(message, "رد على الشخص")
 
-if text == "مسح المقيدين":
-    return clear_restricted(bot, message)
+        try:
 
-if text == "مسح المحظورين":
-    return clear_banned(bot, message)
+            bot.ban_chat_member(
+                message.chat.id,
+                message.reply_to_message.from_user.id
+            )
 
-if text == "انذار":
-    return warn(bot, message)
+            bot.reply_to(message, "تم حظر العضو")
 
-if text == "انذاراته":
-    return warnings_count(bot, message)
+        except:
 
-if text == "مسح انذاراته":
-    return clear_warnings(bot, message)
+            bot.reply_to(message, "ماكدرت احظره")
 
-print("BOT READY") bot.infinity_polling(skip_pending=True)
+    # طرد
+    if text == "طرد":
+
+        if not message.reply_to_message:
+            return bot.reply_to(message, "رد على الشخص")
+
+        try:
+
+            uid = message.reply_to_message.from_user.id
+
+            bot.ban_chat_member(
+                message.chat.id,
+                uid
+            )
+
+            bot.unban_chat_member(
+                message.chat.id,
+                uid
+            )
+
+            bot.reply_to(message, "تم طرد العضو")
+
+        except:
+
+            bot.reply_to(message, "ماكدرت اطرده")
+
+
+print("BOT READY")
+
+bot.infinity_polling(skip_pending=True)
